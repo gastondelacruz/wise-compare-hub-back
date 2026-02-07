@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { AuthController } from './auth.controller';
 import { LoginUseCase } from '@contexts/auth/application/ports/input/login-use-case';
+import { LogoutUseCase } from '@contexts/auth/application/ports/input/logout-use-case';
 import { LoginCommand } from '@contexts/auth/application/dto/login-command';
 import { LoginResponseDto as AppLoginResponseDto } from '@contexts/auth/application/dto/login-response.dto';
 import { UnauthorizedException } from '@nestjs/common';
@@ -8,9 +9,13 @@ import { UnauthorizedException } from '@nestjs/common';
 describe('AuthController', () => {
   let controller: AuthController;
   let mockLoginUseCase: jest.Mocked<LoginUseCase>;
+  let mockLogoutUseCase: jest.Mocked<LogoutUseCase>;
 
   beforeEach(async () => {
     mockLoginUseCase = {
+      execute: jest.fn(),
+    };
+    mockLogoutUseCase = {
       execute: jest.fn(),
     };
 
@@ -20,6 +25,10 @@ describe('AuthController', () => {
         {
           provide: 'LoginUseCase',
           useValue: mockLoginUseCase,
+        },
+        {
+          provide: 'LogoutUseCase',
+          useValue: mockLogoutUseCase,
         },
       ],
     }).compile();
@@ -61,5 +70,32 @@ describe('AuthController', () => {
         password: 'wrong-password',
       }),
     ).rejects.toThrow(UnauthorizedException);
+  });
+
+  describe('logout', () => {
+    it('should logout successfully with valid token', async () => {
+      mockLogoutUseCase.execute.mockResolvedValue(undefined);
+
+      const result = await controller.logout('valid-token');
+
+      expect(result.success).toBe(true);
+      expect(mockLogoutUseCase.execute).toHaveBeenCalledWith('valid-token');
+    });
+
+    it('should throw UnauthorizedException when token is missing', async () => {
+      await expect(controller.logout(null)).rejects.toThrow(
+        UnauthorizedException,
+      );
+    });
+
+    it('should throw UnauthorizedException when token is invalid', async () => {
+      mockLogoutUseCase.execute.mockRejectedValue(
+        new Error('Invalid or expired token'),
+      );
+
+      await expect(controller.logout('invalid-token')).rejects.toThrow(
+        UnauthorizedException,
+      );
+    });
   });
 });

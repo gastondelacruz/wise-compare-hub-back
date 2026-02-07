@@ -101,4 +101,62 @@ describe('AuthController (e2e)', () => {
         });
     });
   });
+
+  describe('POST /api/auth/logout', () => {
+    let authToken: string;
+
+    beforeEach(async () => {
+      // Login to get a valid token
+      const loginResponse = await request(app.getHttpServer())
+        .post('/api/auth/login')
+        .send({
+          email: 'test@example.com',
+          password: 'password123',
+        });
+
+      authToken = loginResponse.body.token as string;
+    });
+
+    it('should logout successfully with valid token', () => {
+      return request(app.getHttpServer())
+        .post('/api/auth/logout')
+        .set('Authorization', `Bearer ${authToken}`)
+        .expect(200)
+        .expect((res) => {
+          expect(res.body.success).toBe(true);
+        });
+    });
+
+    it('should return 401 when token is missing', () => {
+      return request(app.getHttpServer()).post('/api/auth/logout').expect(401);
+    });
+
+    it('should return 401 when token is invalid', () => {
+      return request(app.getHttpServer())
+        .post('/api/auth/logout')
+        .set('Authorization', 'Bearer invalid-token')
+        .expect(401);
+    });
+
+    it('should return 401 when token format is incorrect', () => {
+      return request(app.getHttpServer())
+        .post('/api/auth/logout')
+        .set('Authorization', 'InvalidFormat token')
+        .expect(401);
+    });
+
+    it('should invalidate token after logout', async () => {
+      // First logout
+      await request(app.getHttpServer())
+        .post('/api/auth/logout')
+        .set('Authorization', `Bearer ${authToken}`)
+        .expect(200);
+
+      // Try to logout again with same token - should fail
+      return request(app.getHttpServer())
+        .post('/api/auth/logout')
+        .set('Authorization', `Bearer ${authToken}`)
+        .expect(401);
+    });
+  });
 });

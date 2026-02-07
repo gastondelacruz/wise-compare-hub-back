@@ -2,6 +2,7 @@ import { LoginService } from './login.service';
 import { LoginCommand } from '../dto/login-command';
 import { UserRepository } from '../ports/output/user.repository';
 import { TokenGenerator } from '../ports/output/token-generator';
+import { TokenStore } from '../ports/output/token-store';
 import { User } from '@contexts/auth/domain/models/user.entity';
 import { UserId } from '@contexts/auth/domain/models/user-id.vo';
 import { Email } from '@contexts/auth/domain/models/email.vo';
@@ -11,6 +12,7 @@ describe('LoginService', () => {
   let service: LoginService;
   let mockUserRepository: jest.Mocked<UserRepository>;
   let mockTokenGenerator: jest.Mocked<TokenGenerator>;
+  let mockTokenStore: jest.Mocked<TokenStore>;
 
   beforeEach(() => {
     mockUserRepository = {
@@ -19,7 +21,16 @@ describe('LoginService', () => {
     mockTokenGenerator = {
       generate: jest.fn(),
     };
-    service = new LoginService(mockUserRepository, mockTokenGenerator);
+    mockTokenStore = {
+      save: jest.fn(),
+      exists: jest.fn(),
+      remove: jest.fn(),
+    };
+    service = new LoginService(
+      mockUserRepository,
+      mockTokenGenerator,
+      mockTokenStore,
+    );
   });
 
   it('should login successfully with valid credentials', async () => {
@@ -44,6 +55,7 @@ describe('LoginService', () => {
       expect.any(Email),
     );
     expect(mockTokenGenerator.generate).toHaveBeenCalledWith(user);
+    expect(mockTokenStore.save).toHaveBeenCalledWith(expect.any(Object));
   });
 
   it('should throw error when user not found', async () => {
