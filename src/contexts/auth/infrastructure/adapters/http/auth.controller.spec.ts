@@ -4,7 +4,6 @@ import { LoginUseCase } from '@contexts/auth/application/ports/input/login-use-c
 import { LogoutUseCase } from '@contexts/auth/application/ports/input/logout-use-case';
 import { LoginCommand } from '@contexts/auth/application/dto/login-command';
 import { LoginResponseDto as AppLoginResponseDto } from '@contexts/auth/application/dto/login-response.dto';
-import { UnauthorizedException } from '@nestjs/common';
 
 describe('AuthController', () => {
   let controller: AuthController;
@@ -59,7 +58,7 @@ describe('AuthController', () => {
     );
   });
 
-  it('should throw UnauthorizedException when credentials are invalid', async () => {
+  it('should propagate error when credentials are invalid', async () => {
     mockLoginUseCase.execute.mockRejectedValue(
       new Error('Invalid credentials'),
     );
@@ -69,7 +68,7 @@ describe('AuthController', () => {
         email: 'test@example.com',
         password: 'wrong-password',
       }),
-    ).rejects.toThrow(UnauthorizedException);
+    ).rejects.toThrow('Invalid credentials');
   });
 
   describe('logout', () => {
@@ -82,19 +81,23 @@ describe('AuthController', () => {
       expect(mockLogoutUseCase.execute).toHaveBeenCalledWith('valid-token');
     });
 
-    it('should throw UnauthorizedException when token is missing', async () => {
+    it('should propagate error when token is missing', async () => {
+      mockLogoutUseCase.execute.mockRejectedValue(
+        new Error('Token cannot be empty'),
+      );
+
       await expect(controller.logout(null)).rejects.toThrow(
-        UnauthorizedException,
+        'Token cannot be empty',
       );
     });
 
-    it('should throw UnauthorizedException when token is invalid', async () => {
+    it('should propagate error when token is invalid', async () => {
       mockLogoutUseCase.execute.mockRejectedValue(
         new Error('Invalid or expired token'),
       );
 
       await expect(controller.logout('invalid-token')).rejects.toThrow(
-        UnauthorizedException,
+        'Invalid or expired token',
       );
     });
   });

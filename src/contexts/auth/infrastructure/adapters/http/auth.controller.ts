@@ -5,8 +5,6 @@ import {
   HttpCode,
   HttpStatus,
   Inject,
-  UnauthorizedException,
-  BadRequestException,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -49,28 +47,9 @@ export class AuthController {
     description: 'Unauthorized - invalid credentials',
   })
   async login(@Body() dto: LoginRequestDto): Promise<LoginResponseDto> {
-    try {
-      const command = new LoginCommand(dto.email, dto.password);
-      const result = await this.loginUseCase.execute(command);
-
-      return {
-        token: result.token,
-        user: result.user,
-      };
-    } catch (error) {
-      if (error instanceof Error) {
-        if (error.message === 'Invalid credentials') {
-          throw new UnauthorizedException('Invalid credentials');
-        }
-        if (
-          error.message.includes('cannot be empty') ||
-          error.message.includes('Invalid email format')
-        ) {
-          throw new BadRequestException(error.message);
-        }
-      }
-      throw error;
-    }
+    const command = new LoginCommand(dto.email, dto.password);
+    const result = await this.loginUseCase.execute(command);
+    return LoginResponseDto.fromApplication(result);
   }
 
   @Post('logout')
@@ -87,21 +66,7 @@ export class AuthController {
     description: 'Unauthorized - invalid or missing token',
   })
   async logout(@Token() token: string | null): Promise<LogoutResponseDto> {
-    if (!token) {
-      throw new UnauthorizedException('Token is required');
-    }
-
-    try {
-      await this.logoutUseCase.execute(token);
-      return { success: true };
-    } catch (error) {
-      if (
-        error instanceof Error &&
-        error.message === 'Invalid or expired token'
-      ) {
-        throw new UnauthorizedException('Invalid or expired token');
-      }
-      throw error;
-    }
+    await this.logoutUseCase.execute(token || '');
+    return LogoutResponseDto.success();
   }
 }

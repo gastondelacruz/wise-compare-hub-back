@@ -1,4 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { LoginResponseDto as ApplicationLoginResponseDto } from '@contexts/auth/application/dto/login-response.dto';
 
 export class LoginResponseDto {
   @ApiProperty({
@@ -21,4 +22,11 @@ export class LoginResponseDto {
     email: string;
     name?: string;
   };
+
+  static fromApplication(dto: ApplicationLoginResponseDto): LoginResponseDto {
+    return {
+      token: dto.token,
+      user: dto.user,
+    };
+  }
 }

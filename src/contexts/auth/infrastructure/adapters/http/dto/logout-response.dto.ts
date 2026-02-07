@@ -6,4 +6,8 @@ export class LogoutResponseDto {
     example: true,
   })
   readonly success: boolean;
+
+  static success(): LogoutResponseDto {
+    return { success: true };
+  }
 }
