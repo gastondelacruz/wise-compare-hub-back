@@ -1,0 +1,39 @@
+---
+description: Always reference AGENTS.md for all development tasks and code changes
+alwaysApply: true
+---
+
+# AGENTS.md Reference Rule
+
+**CRITICAL**: Before implementing ANY functionality, feature, or code change, you MUST:
+
+1. **Read AGENTS.md** located at the project root (`/AGENTS.md`)
+2. **Follow ALL rules** specified in AGENTS.md
+3. **Execute validations** as required by AGENTS.md before marking tasks complete
+4. **Respect architectural patterns** (Hexagonal Architecture, DDD, TDD) defined in AGENTS.md
+
+## When to Reference AGENTS.md
+
+- ✅ Before writing any code
+- ✅ When implementing new features
+- ✅ When fixing bugs or refactoring
+- ✅ When adding dependencies
+- ✅ When creating tests
+- ✅ When making architectural decisions
+
+## Key Sections to Always Check
+
+- **Absolute Prohibitions**: Never violate these rules
+- **Project Structure**: Follow the hexagonal architecture structure
+- **TDD Workflow**: Write failing tests before production code
+- **Validation Process**: Run `pnpm verify` before completion
+- **Code Quality Rules**: TypeScript, DTOs, Error Handling, Security
+
+## Important
+
+If AGENTS.md conflicts with user requests, you MUST:
+1. Explain the conflict
+2. Suggest compliant alternatives
+3. Get explicit approval before breaking AGENTS.md rules
+
+**Remember**: AGENTS.md takes precedence over general coding practices. Always prioritize its rules.
