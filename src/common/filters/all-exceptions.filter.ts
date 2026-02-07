@@ -8,6 +8,7 @@ import {
 import { Response } from 'express';
 import { InvalidCredentialsError } from '@contexts/auth/domain/exceptions/invalid-credentials.error';
 import { InvalidTokenError } from '@contexts/auth/domain/exceptions/invalid-token.error';
+import { ProductNotFoundError } from '@contexts/product/domain/exceptions/product-not-found.error';
 
 @Catch()
 export class AllExceptionsFilter implements ExceptionFilter {
@@ -16,6 +17,15 @@ export class AllExceptionsFilter implements ExceptionFilter {
     const response = ctx.getResponse<Response>();
 
     // Domain exceptions - Map to HTTP status codes
+    if (exception instanceof ProductNotFoundError) {
+      response.status(HttpStatus.NOT_FOUND).json({
+        statusCode: HttpStatus.NOT_FOUND,
+        message: exception.message,
+        error: 'Not Found',
+      });
+      return;
+    }
+
     if (exception instanceof InvalidCredentialsError) {
       response.status(HttpStatus.UNAUTHORIZED).json({
         statusCode: HttpStatus.UNAUTHORIZED,
