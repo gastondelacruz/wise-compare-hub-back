@@ -26,6 +26,24 @@ describe('InMemoryProductRepository', () => {
     repository = new InMemoryProductRepository();
   });
 
+  it('should find product by id', async () => {
+    const products = await repository.findAll();
+    expect(products.length).toBeGreaterThan(0);
+
+    const firstProduct = products[0];
+    const found = await repository.findById(firstProduct.id);
+
+    expect(found).not.toBeNull();
+    expect(found?.id.value).toBe(firstProduct.id.value);
+  });
+
+  it('should return null when product not found', async () => {
+    const nonExistentId = new ProductId('non-existent-id');
+    const found = await repository.findById(nonExistentId);
+
+    expect(found).toBeNull();
+  });
+
   it('should return empty array when initialized with empty array', async () => {
     const emptyRepository = new (class extends InMemoryProductRepository {
       constructor() {

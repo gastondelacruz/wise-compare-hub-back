@@ -2,15 +2,21 @@ import {
   Controller,
   Get,
   Query,
+  Param,
   Inject,
   HttpCode,
   HttpStatus,
+  NotFoundException,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiParam } from '@nestjs/swagger';
 import { SearchProductsUseCase } from '@contexts/product/application/ports/input/search-products-use-case';
+import { GetProductByIdUseCase } from '@contexts/product/application/ports/input/get-product-by-id-use-case';
 import { SearchProductsQuery } from '@contexts/product/application/dto/search-products-query';
 import { SearchProductsDto } from './dto/search-products.dto';
-import { SearchProductsResponseDto } from './dto/search-products-response.dto';
+import {
+  SearchProductsResponseDto,
+  ProductResponseDto,
+} from './dto/search-products-response.dto';
 
 @ApiTags('products')
 @Controller('products')
@@ -18,6 +24,8 @@ export class ProductsController {
   constructor(
     @Inject('SearchProductsUseCase')
     private readonly searchProductsUseCase: SearchProductsUseCase,
+    @Inject('GetProductByIdUseCase')
+    private readonly getProductByIdUseCase: GetProductByIdUseCase,
   ) {}
 
   @Get('search')
@@ -68,5 +76,38 @@ export class ProductsController {
       limit: result.limit,
       totalPages: result.totalPages,
     };
+  }
+
+  @Get(':productId')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Get product by ID' })
+  @ApiParam({ name: 'productId', description: 'Product ID' })
+  @ApiResponse({
+    status: 200,
+    description: 'Product found',
+    type: ProductResponseDto,
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Product not found',
+  })
+  async getById(
+    @Param('productId') productId: string,
+  ): Promise<ProductResponseDto> {
+    try {
+      const product = await this.getProductByIdUseCase.execute(productId);
+
+      return {
+        id: product.id.value,
+        name: product.name.value,
+        price: product.price.value,
+        source: product.source.value,
+      };
+    } catch (error) {
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+      throw error;
+    }
   }
 }

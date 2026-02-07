@@ -249,4 +249,40 @@ describe('ProductsController (e2e)', () => {
         .expect(400);
     });
   });
+
+  describe('GET /api/products/:productId', () => {
+    it('should return product by id', () => {
+      return request(app.getHttpServer())
+        .get('/api/products/1')
+        .expect(200)
+        .expect((res) => {
+          expect(res.body).toHaveProperty('id');
+          expect(res.body).toHaveProperty('name');
+          expect(res.body).toHaveProperty('price');
+          expect(res.body).toHaveProperty('source');
+          expect(res.body.id).toBe('1');
+        });
+    });
+
+    it('should return 404 when product not found', () => {
+      return request(app.getHttpServer())
+        .get('/api/products/non-existent-id')
+        .expect(404)
+        .expect((res) => {
+          expect(res.body.message).toBe('Product not found');
+        });
+    });
+
+    it('should return product with all fields', () => {
+      return request(app.getHttpServer())
+        .get('/api/products/1')
+        .expect(200)
+        .expect((res) => {
+          expect(typeof res.body.id).toBe('string');
+          expect(typeof res.body.name).toBe('string');
+          expect(typeof res.body.price).toBe('number');
+          expect(typeof res.body.source).toBe('string');
+        });
+    });
+  });
 });

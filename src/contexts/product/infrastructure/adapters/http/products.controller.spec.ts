@@ -1,16 +1,19 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ProductsController } from './products.controller';
 import { SearchProductsUseCase } from '@contexts/product/application/ports/input/search-products-use-case';
+import { GetProductByIdUseCase } from '@contexts/product/application/ports/input/get-product-by-id-use-case';
 import { SearchProductsResponseDto as ApplicationResponseDto } from '@contexts/product/application/dto/search-products-response.dto';
 import { Product } from '@contexts/product/domain/models/product.entity';
 import { ProductId } from '@contexts/product/domain/models/product-id.vo';
 import { ProductName } from '@contexts/product/domain/models/product-name.vo';
 import { Price } from '@contexts/product/domain/models/price.vo';
 import { Source } from '@contexts/product/domain/models/source.vo';
+import { NotFoundException } from '@nestjs/common';
 
 describe('ProductsController', () => {
   let controller: ProductsController;
-  let mockUseCase: jest.Mocked<SearchProductsUseCase>;
+  let mockSearchUseCase: jest.Mocked<SearchProductsUseCase>;
+  let mockGetByIdUseCase: jest.Mocked<GetProductByIdUseCase>;
 
   const createTestProduct = (
     id: string,
@@ -27,7 +30,10 @@ describe('ProductsController', () => {
   };
 
   beforeEach(async () => {
-    mockUseCase = {
+    mockSearchUseCase = {
+      execute: jest.fn(),
+    };
+    mockGetByIdUseCase = {
       execute: jest.fn(),
     };
 
@@ -36,7 +42,11 @@ describe('ProductsController', () => {
       providers: [
         {
           provide: 'SearchProductsUseCase',
-          useValue: mockUseCase,
+          useValue: mockSearchUseCase,
+        },
+        {
+          provide: 'GetProductByIdUseCase',
+          useValue: mockGetByIdUseCase,
         },
       ],
     }).compile();
@@ -51,7 +61,7 @@ describe('ProductsController', () => {
   it('should search products with query params', async () => {
     const products = [createTestProduct('1', 'Laptop', 1000, 'amazon')];
     const response = new ApplicationResponseDto(products, 1, 1, 20, 1);
-    mockUseCase.execute.mockResolvedValue(response);
+    mockSearchUseCase.execute.mockResolvedValue(response);
 
     const result = await controller.search({
       q: 'laptop',
@@ -76,7 +86,7 @@ describe('ProductsController', () => {
       createTestProduct('2', 'Product 2', 200, 'mercadolibre'),
     ];
     const response = new ApplicationResponseDto(products, 2, 1, 20, 1);
-    mockUseCase.execute.mockResolvedValue(response);
+    mockSearchUseCase.execute.mockResolvedValue(response);
 
     const result = await controller.search({});
 
@@ -92,6 +102,34 @@ describe('ProductsController', () => {
       name: 'Product 2',
       price: 200,
       source: 'mercadolibre',
+    });
+  });
+
+  describe('getById', () => {
+    it('should return product by id', async () => {
+      const product = createTestProduct('1', 'Laptop', 1000, 'amazon');
+      mockGetByIdUseCase.execute.mockResolvedValue(product);
+
+      const result = await controller.getById('1');
+
+      expect(result).toEqual({
+        id: '1',
+        name: 'Laptop',
+        price: 1000,
+        source: 'amazon',
+      });
+      expect(mockGetByIdUseCase.execute).toHaveBeenCalledWith('1');
+    });
+
+    it('should throw NotFoundException when product not found', async () => {
+      mockGetByIdUseCase.execute.mockRejectedValue(
+        new NotFoundException('Product not found'),
+      );
+
+      await expect(controller.getById('999')).rejects.toThrow(
+        NotFoundException,
+      );
+      expect(mockGetByIdUseCase.execute).toHaveBeenCalledWith('999');
     });
   });
 });

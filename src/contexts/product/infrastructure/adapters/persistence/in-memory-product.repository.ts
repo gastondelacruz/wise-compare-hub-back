@@ -18,6 +18,11 @@ export class InMemoryProductRepository implements ProductRepository {
     return Promise.resolve([...this.products]);
   }
 
+  findById(id: ProductId): Promise<Product | null> {
+    const product = this.products.find((p) => p.id.value === id.value);
+    return Promise.resolve(product ?? null);
+  }
+
   private getDefaultProducts(): Product[] {
     return [
       new Product(
