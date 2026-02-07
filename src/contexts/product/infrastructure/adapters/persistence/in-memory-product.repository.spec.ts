@@ -1,24 +1,22 @@
 import { InMemoryProductRepository } from './in-memory-product.repository';
 import { Product } from '@contexts/product/domain/models/product.entity';
 import { ProductId } from '@contexts/product/domain/models/product-id.vo';
-import { ProductName } from '@contexts/product/domain/models/product-name.vo';
-import { Price } from '@contexts/product/domain/models/price.vo';
-import { Source } from '@contexts/product/domain/models/source.vo';
+import { CanonicalProductId } from '@contexts/product/domain/models/canonical-product-id.vo';
 
 describe('InMemoryProductRepository', () => {
   let repository: InMemoryProductRepository;
 
-  const createTestProduct = (
+  const createProduct = (
     id: string,
+    canonicalId: string,
     name: string,
-    price: number,
-    source: string,
   ): Product => {
     return new Product(
       new ProductId(id),
-      new ProductName(name),
-      new Price(price),
-      new Source(source),
+      new CanonicalProductId(canonicalId),
+      name,
+      'Laptops',
+      'https://example.com/image.jpg',
     );
   };
 
@@ -26,77 +24,67 @@ describe('InMemoryProductRepository', () => {
     repository = new InMemoryProductRepository();
   });
 
-  it('should find product by id', async () => {
+  it('should return all products', async () => {
     const products = await repository.findAll();
-    expect(products.length).toBeGreaterThan(0);
-
-    const firstProduct = products[0];
-    const found = await repository.findById(firstProduct.id);
-
-    expect(found).not.toBeNull();
-    expect(found?.id.value).toBe(firstProduct.id.value);
+    expect(Array.isArray(products)).toBe(true);
   });
 
-  it('should return null when product not found', async () => {
-    const nonExistentId = new ProductId('non-existent-id');
-    const found = await repository.findById(nonExistentId);
+  it('should find product by id', async () => {
+    const product = createProduct('prod-1', 'canonical-1', 'Product 1');
+    await repository.save(product);
 
+    const found = await repository.findById(new ProductId('prod-1'));
+    expect(found).not.toBeNull();
+    expect(found?.id.value).toBe('prod-1');
+  });
+
+  it('should return null when product not found by id', async () => {
+    const found = await repository.findById(new ProductId('nonexistent'));
     expect(found).toBeNull();
   });
 
-  it('should return empty array when initialized with empty array', async () => {
-    const emptyRepository = new (class extends InMemoryProductRepository {
-      constructor() {
-        super();
-        (this as unknown as { products: Product[] }).products = [];
-      }
-    })();
-    const products = await emptyRepository.findAll();
-    expect(products).toEqual([]);
+  it('should find products by canonicalProductId', async () => {
+    const product1 = createProduct('prod-1', 'canonical-1', 'Product 1');
+    const product2 = createProduct(
+      'prod-2',
+      'canonical-1',
+      'Product 1 Variant',
+    );
+    await repository.save(product1);
+    await repository.save(product2);
+
+    const found = await repository.findByCanonicalProductId(
+      new CanonicalProductId('canonical-1'),
+    );
+    expect(found).toHaveLength(2);
   });
 
-  it('should return default products when initialized without parameters', async () => {
-    const products = await repository.findAll();
-    expect(products.length).toBeGreaterThan(0);
+  it('should find products by search term', async () => {
+    const product1 = createProduct('prod-1', 'canonical-1', 'MacBook Pro');
+    const product2 = createProduct('prod-2', 'canonical-2', 'iPhone 15');
+    await repository.save(product1);
+    await repository.save(product2);
+
+    const found = await repository.findBySearchTerm('macbook');
+    expect(found).toHaveLength(1);
+    expect(found[0].name.toLowerCase()).toContain('macbook');
   });
 
-  it('should return all products after initialization', async () => {
-    const testProducts = [
-      createTestProduct('1', 'Product 1', 100, 'amazon'),
-      createTestProduct('2', 'Product 2', 200, 'mercadolibre'),
-    ];
-    const customRepository = new (class extends InMemoryProductRepository {
-      constructor() {
-        super();
-        (this as unknown as { products: Product[] }).products = testProducts;
-      }
-    })();
+  it('should be case insensitive when searching', async () => {
+    const product = createProduct(
+      'prod-test',
+      'canonical-test',
+      'MacBook Pro Test',
+    );
+    await repository.save(product);
 
-    const products = await customRepository.findAll();
-    expect(products).toHaveLength(2);
-    expect(products[0].id.value).toBe('1');
-    expect(products[1].id.value).toBe('2');
+    const found = await repository.findBySearchTerm('MACBOOK');
+    expect(found.length).toBeGreaterThanOrEqual(1);
+    expect(found.some((p) => p.name.includes('MacBook'))).toBe(true);
   });
 
-  it('should return products with different sources', async () => {
-    const testProducts = [
-      createTestProduct('1', 'Laptop', 1000, 'amazon'),
-      createTestProduct('2', 'Mouse', 20, 'mercadolibre'),
-      createTestProduct('3', 'Keyboard', 50, 'falabella'),
-    ];
-    const customRepository = new (class extends InMemoryProductRepository {
-      constructor() {
-        super();
-        (this as unknown as { products: Product[] }).products = testProducts;
-      }
-    })();
-
-    const products = await customRepository.findAll();
-    expect(products).toHaveLength(3);
-    expect(products.map((p) => p.source.value)).toEqual([
-      'amazon',
-      'mercadolibre',
-      'falabella',
-    ]);
+  it('should return empty array when no products match search term', async () => {
+    const found = await repository.findBySearchTerm('nonexistent');
+    expect(found).toHaveLength(0);
   });
 });

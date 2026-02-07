@@ -1,284 +1,305 @@
 import { SearchProductsService } from './search-products.service';
-import { ProductRepository } from '../ports/output/product.repository';
-import { RecentSearchRepository } from '../ports/output/recent-search.repository';
 import { SearchProductsQuery } from '../dto/search-products-query';
+import { ProductRepository } from '../ports/output/product.repository';
+import { OfferRepository } from '../ports/output/offer.repository';
 import { Product } from '@contexts/product/domain/models/product.entity';
 import { ProductId } from '@contexts/product/domain/models/product-id.vo';
-import { ProductName } from '@contexts/product/domain/models/product-name.vo';
+import { CanonicalProductId } from '@contexts/product/domain/models/canonical-product-id.vo';
+import { Offer } from '@contexts/product/domain/models/offer.entity';
+import { OfferId } from '@contexts/product/domain/models/offer-id.vo';
+import { Vendor } from '@contexts/product/domain/models/vendor.entity';
+import { VendorId } from '@contexts/product/domain/models/vendor-id.vo';
 import { Price } from '@contexts/product/domain/models/price.vo';
-import { Source } from '@contexts/product/domain/models/source.vo';
+import { DeliveryDays } from '@contexts/product/domain/models/delivery-days.vo';
+import { Rating } from '@contexts/product/domain/models/rating.vo';
 
 describe('SearchProductsService', () => {
   let service: SearchProductsService;
-  let mockRepository: jest.Mocked<ProductRepository>;
-  let mockRecentSearchRepository: jest.Mocked<RecentSearchRepository>;
+  let mockProductRepository: jest.Mocked<ProductRepository>;
+  let mockOfferRepository: jest.Mocked<OfferRepository>;
 
-  const createTestProduct = (
+  const createProduct = (
     id: string,
+    canonicalId: string,
     name: string,
-    price: number,
-    source: string,
   ): Product => {
     return new Product(
       new ProductId(id),
-      new ProductName(name),
-      new Price(price),
-      new Source(source),
+      new CanonicalProductId(canonicalId),
+      name,
+      'Laptops',
+      'https://example.com/image.jpg',
+    );
+  };
+
+  const createVendor = (id: string, name: string): Vendor => {
+    return new Vendor(new VendorId(id), name, false);
+  };
+
+  const createOffer = (
+    id: string,
+    productId: string,
+    vendorId: string,
+    vendorName: string,
+    basePrice: number,
+    shipping: number,
+    deliveryDays: number,
+    rating?: number,
+  ): Offer => {
+    return new Offer(
+      new OfferId(id),
+      new ProductId(productId),
+      createVendor(vendorId, vendorName),
+      new Price(basePrice, shipping),
+      new DeliveryDays(deliveryDays),
+      rating ? new Rating(rating) : undefined,
     );
   };
 
   beforeEach(() => {
-    mockRepository = {
+    mockProductRepository = {
       findAll: jest.fn(),
+      findById: jest.fn(),
+      findByCanonicalProductId: jest.fn(),
+      findBySearchTerm: jest.fn(),
     };
-    mockRecentSearchRepository = {
-      findByUserId: jest.fn(),
-      findGlobal: jest.fn(),
-      save: jest.fn(),
-      saveGlobal: jest.fn(),
+    mockOfferRepository = {
+      findByProductIds: jest.fn(),
     };
     service = new SearchProductsService(
-      mockRepository,
-      mockRecentSearchRepository,
+      mockProductRepository,
+      mockOfferRepository,
     );
   });
 
-  it('should return all products when no filters applied', async () => {
-    const products = [
-      createTestProduct('1', 'Laptop', 1000, 'amazon'),
-      createTestProduct('2', 'Mouse', 20, 'mercadolibre'),
-    ];
-    mockRepository.findAll.mockResolvedValue(products);
+  it('should return empty results when no products match search term', async () => {
+    mockProductRepository.findBySearchTerm.mockResolvedValue([]);
+    mockOfferRepository.findByProductIds.mockResolvedValue([]);
 
-    const query = new SearchProductsQuery();
+    const query = new SearchProductsQuery('nonexistent');
     const result = await service.execute(query);
 
-    expect(result.products).toHaveLength(2);
-    expect(result.total).toBe(2);
-    expect(result.page).toBe(1);
-    expect(result.limit).toBe(20);
+    expect(result.total).toBe(0);
+    expect(result.products).toHaveLength(0);
+    expect(result.query).toBe('nonexistent');
   });
 
-  it('should filter by text query', async () => {
+  it('should return products grouped by canonicalProductId', async () => {
     const products = [
-      createTestProduct('1', 'Laptop Dell', 1000, 'amazon'),
-      createTestProduct('2', 'Mouse Logitech', 20, 'amazon'),
-      createTestProduct('3', 'Laptop HP', 800, 'mercadolibre'),
+      createProduct('prod-1', 'macbook-pro', 'MacBook Pro'),
+      createProduct('prod-2', 'macbook-pro', 'MacBook Pro'),
     ];
-    mockRepository.findAll.mockResolvedValue(products);
+    mockProductRepository.findBySearchTerm.mockResolvedValue(products);
 
-    const query = new SearchProductsQuery('laptop');
+    const offers = [
+      createOffer('offer-1', 'prod-1', 'amazon', 'Amazon', 1899, 0, 2, 4.5),
+      createOffer('offer-2', 'prod-2', 'bestbuy', 'Best Buy', 1999, 10, 5, 4.3),
+    ];
+    mockOfferRepository.findByProductIds.mockResolvedValue(offers);
+
+    const query = new SearchProductsQuery('macbook');
     const result = await service.execute(query);
 
-    expect(result.products).toHaveLength(2);
-    expect(result.products[0].name.value).toBe('Laptop Dell');
-    expect(result.products[1].name.value).toBe('Laptop HP');
+    expect(result.total).toBe(1);
+    expect(result.products).toHaveLength(1);
+    expect(result.products[0].canonicalProductId).toBe('macbook-pro');
+    expect(result.products[0].offersSummary.offersCount).toBe(2);
   });
 
-  it('should filter by minPrice', async () => {
-    const products = [
-      createTestProduct('1', 'Product 1', 100, 'amazon'),
-      createTestProduct('2', 'Product 2', 200, 'amazon'),
-      createTestProduct('3', 'Product 3', 50, 'amazon'),
-    ];
-    mockRepository.findAll.mockResolvedValue(products);
+  it('should calculate price range correctly', async () => {
+    const products = [createProduct('prod-1', 'macbook-pro', 'MacBook Pro')];
+    mockProductRepository.findBySearchTerm.mockResolvedValue(products);
 
-    const query = new SearchProductsQuery(undefined, 100);
+    const offers = [
+      createOffer('offer-1', 'prod-1', 'amazon', 'Amazon', 1899, 0, 2),
+      createOffer('offer-2', 'prod-1', 'bestbuy', 'Best Buy', 1999, 10, 5),
+      createOffer('offer-3', 'prod-1', 'newegg', 'Newegg', 2100, 0, 3),
+    ];
+    mockOfferRepository.findByProductIds.mockResolvedValue(offers);
+
+    const query = new SearchProductsQuery('macbook');
     const result = await service.execute(query);
 
-    expect(result.products).toHaveLength(2);
-    expect(result.products.every((p) => p.price.value >= 100)).toBe(true);
+    expect(result.products[0].priceRange.min).toBe(1899);
+    expect(result.products[0].priceRange.max).toBe(2100);
+    expect(result.products[0].offersSummary.bestPrice).toBe(1899);
   });
 
-  it('should filter by maxPrice', async () => {
-    const products = [
-      createTestProduct('1', 'Product 1', 100, 'amazon'),
-      createTestProduct('2', 'Product 2', 200, 'amazon'),
-      createTestProduct('3', 'Product 3', 300, 'amazon'),
-    ];
-    mockRepository.findAll.mockResolvedValue(products);
+  it('should filter offers by minPrice', async () => {
+    const products = [createProduct('prod-1', 'macbook-pro', 'MacBook Pro')];
+    mockProductRepository.findBySearchTerm.mockResolvedValue(products);
 
-    const query = new SearchProductsQuery(undefined, undefined, 200);
+    const offers = [
+      createOffer('offer-1', 'prod-1', 'amazon', 'Amazon', 1500, 0, 2),
+      createOffer('offer-2', 'prod-1', 'bestbuy', 'Best Buy', 2000, 0, 5),
+    ];
+    mockOfferRepository.findByProductIds.mockResolvedValue(offers);
+
+    const query = new SearchProductsQuery('macbook', 'relevance', 1800);
     const result = await service.execute(query);
 
-    expect(result.products).toHaveLength(2);
-    expect(result.products.every((p) => p.price.value <= 200)).toBe(true);
+    expect(result.products[0].offersSummary.offersCount).toBe(1);
+    expect(result.products[0].offersSummary.bestPrice).toBe(2000);
   });
 
-  it('should filter by price range', async () => {
-    const products = [
-      createTestProduct('1', 'Product 1', 100, 'amazon'),
-      createTestProduct('2', 'Product 2', 200, 'amazon'),
-      createTestProduct('3', 'Product 3', 300, 'amazon'),
-      createTestProduct('4', 'Product 4', 150, 'amazon'),
-    ];
-    mockRepository.findAll.mockResolvedValue(products);
+  it('should filter offers by maxPrice', async () => {
+    const products = [createProduct('prod-1', 'macbook-pro', 'MacBook Pro')];
+    mockProductRepository.findBySearchTerm.mockResolvedValue(products);
 
-    const query = new SearchProductsQuery(undefined, 100, 200);
+    const offers = [
+      createOffer('offer-1', 'prod-1', 'amazon', 'Amazon', 1500, 0, 2),
+      createOffer('offer-2', 'prod-1', 'bestbuy', 'Best Buy', 2000, 0, 5),
+    ];
+    mockOfferRepository.findByProductIds.mockResolvedValue(offers);
+
+    const query = new SearchProductsQuery(
+      'macbook',
+      'relevance',
+      undefined,
+      1800,
+    );
     const result = await service.execute(query);
 
-    expect(result.products).toHaveLength(3);
-    expect(
-      result.products.every(
-        (p) => p.price.value >= 100 && p.price.value <= 200,
+    expect(result.products[0].offersSummary.offersCount).toBe(1);
+    expect(result.products[0].offersSummary.bestPrice).toBe(1500);
+  });
+
+  it('should filter offers by vendors', async () => {
+    const products = [createProduct('prod-1', 'macbook-pro', 'MacBook Pro')];
+    mockProductRepository.findBySearchTerm.mockResolvedValue(products);
+
+    const offers = [
+      createOffer('offer-1', 'prod-1', 'amazon', 'Amazon', 1899, 0, 2),
+      createOffer('offer-2', 'prod-1', 'bestbuy', 'Best Buy', 1999, 0, 5),
+      createOffer('offer-3', 'prod-1', 'newegg', 'Newegg', 2100, 0, 3),
+    ];
+    mockOfferRepository.findByProductIds.mockResolvedValue(offers);
+
+    const query = new SearchProductsQuery(
+      'macbook',
+      'relevance',
+      undefined,
+      undefined,
+      ['amazon', 'bestbuy'],
+    );
+    const result = await service.execute(query);
+
+    expect(result.products[0].offersSummary.offersCount).toBe(2);
+  });
+
+  it('should calculate badges correctly', async () => {
+    const products = [
+      createProduct('prod-1', 'macbook-pro', 'MacBook Pro'),
+      createProduct('prod-2', 'iphone-15', 'iPhone 15'),
+    ];
+    mockProductRepository.findBySearchTerm.mockResolvedValue(products);
+
+    const offers = [
+      createOffer('offer-1', 'prod-1', 'amazon', 'Amazon', 1899, 0, 2, 4.5),
+      createOffer('offer-2', 'prod-2', 'bestbuy', 'Best Buy', 1999, 0, 1, 4.8),
+    ];
+    mockOfferRepository.findByProductIds.mockResolvedValue(offers);
+
+    const query = new SearchProductsQuery('apple');
+    const result = await service.execute(query);
+
+    // macbook-pro should have isBestPrice=true (1899 < 1999)
+    const macbook = result.products.find(
+      (p) => p.canonicalProductId === 'macbook-pro',
+    );
+    expect(macbook?.badges.isBestPrice).toBe(true);
+    expect(macbook?.badges.isFastestDelivery).toBe(false);
+
+    // iphone-15 should have isFastestDelivery=true (1 < 2)
+    const iphone = result.products.find(
+      (p) => p.canonicalProductId === 'iphone-15',
+    );
+    expect(iphone?.badges.isFastestDelivery).toBe(true);
+    expect(iphone?.badges.isBestPrice).toBe(false);
+  });
+
+  it('should mark product as popular when offersCount >= 5', async () => {
+    const products = [createProduct('prod-1', 'macbook-pro', 'MacBook Pro')];
+    mockProductRepository.findBySearchTerm.mockResolvedValue(products);
+
+    const offers = Array.from({ length: 5 }, (_, i) =>
+      createOffer(
+        `offer-${i}`,
+        'prod-1',
+        `vendor-${i}`,
+        `Vendor ${i}`,
+        1900 + i,
+        0,
+        2,
       ),
-    ).toBe(true);
+    );
+    mockOfferRepository.findByProductIds.mockResolvedValue(offers);
+
+    const query = new SearchProductsQuery('macbook');
+    const result = await service.execute(query);
+
+    expect(result.products[0].badges.isPopular).toBe(true);
   });
 
-  it('should filter by sources', async () => {
+  it('should sort by price_asc', async () => {
     const products = [
-      createTestProduct('1', 'Product 1', 100, 'amazon'),
-      createTestProduct('2', 'Product 2', 200, 'mercadolibre'),
-      createTestProduct('3', 'Product 3', 300, 'amazon'),
+      createProduct('prod-1', 'product-a', 'Product A'),
+      createProduct('prod-2', 'product-b', 'Product B'),
     ];
-    mockRepository.findAll.mockResolvedValue(products);
+    mockProductRepository.findBySearchTerm.mockResolvedValue(products);
 
-    const query = new SearchProductsQuery(undefined, undefined, undefined, [
-      'amazon',
-    ]);
+    const offers = [
+      createOffer('offer-1', 'prod-1', 'amazon', 'Amazon', 2000, 0, 2),
+      createOffer('offer-2', 'prod-2', 'bestbuy', 'Best Buy', 1500, 0, 5),
+    ];
+    mockOfferRepository.findByProductIds.mockResolvedValue(offers);
+
+    const query = new SearchProductsQuery('product', 'price_asc');
     const result = await service.execute(query);
 
-    expect(result.products).toHaveLength(2);
-    expect(result.products.every((p) => p.source.value === 'amazon')).toBe(
-      true,
-    );
+    expect(result.products[0].canonicalProductId).toBe('product-b');
+    expect(result.products[0].offersSummary.bestPrice).toBe(1500);
+    expect(result.products[1].canonicalProductId).toBe('product-a');
+    expect(result.products[1].offersSummary.bestPrice).toBe(2000);
   });
 
-  it('should filter by multiple sources', async () => {
+  it('should sort by price_desc', async () => {
     const products = [
-      createTestProduct('1', 'Product 1', 100, 'amazon'),
-      createTestProduct('2', 'Product 2', 200, 'mercadolibre'),
-      createTestProduct('3', 'Product 3', 300, 'falabella'),
+      createProduct('prod-1', 'product-a', 'Product A'),
+      createProduct('prod-2', 'product-b', 'Product B'),
     ];
-    mockRepository.findAll.mockResolvedValue(products);
+    mockProductRepository.findBySearchTerm.mockResolvedValue(products);
 
-    const query = new SearchProductsQuery(undefined, undefined, undefined, [
-      'amazon',
-      'mercadolibre',
-    ]);
+    const offers = [
+      createOffer('offer-1', 'prod-1', 'amazon', 'Amazon', 2000, 0, 2),
+      createOffer('offer-2', 'prod-2', 'bestbuy', 'Best Buy', 1500, 0, 5),
+    ];
+    mockOfferRepository.findByProductIds.mockResolvedValue(offers);
+
+    const query = new SearchProductsQuery('product', 'price_desc');
     const result = await service.execute(query);
 
-    expect(result.products).toHaveLength(2);
-    expect(
-      ['amazon', 'mercadolibre'].includes(result.products[0].source.value),
-    ).toBe(true);
-    expect(
-      ['amazon', 'mercadolibre'].includes(result.products[1].source.value),
-    ).toBe(true);
+    expect(result.products[0].canonicalProductId).toBe('product-a');
+    expect(result.products[1].canonicalProductId).toBe('product-b');
   });
 
-  it('should sort by price-low', async () => {
+  it('should sort by rating', async () => {
     const products = [
-      createTestProduct('1', 'Product 1', 300, 'amazon'),
-      createTestProduct('2', 'Product 2', 100, 'amazon'),
-      createTestProduct('3', 'Product 3', 200, 'amazon'),
+      createProduct('prod-1', 'product-a', 'Product A'),
+      createProduct('prod-2', 'product-b', 'Product B'),
     ];
-    mockRepository.findAll.mockResolvedValue(products);
+    mockProductRepository.findBySearchTerm.mockResolvedValue(products);
 
-    const query = new SearchProductsQuery(
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      'price-low',
-    );
-    const result = await service.execute(query);
-
-    expect(result.products[0].price.value).toBe(100);
-    expect(result.products[1].price.value).toBe(200);
-    expect(result.products[2].price.value).toBe(300);
-  });
-
-  it('should sort by price-high', async () => {
-    const products = [
-      createTestProduct('1', 'Product 1', 100, 'amazon'),
-      createTestProduct('2', 'Product 2', 300, 'amazon'),
-      createTestProduct('3', 'Product 3', 200, 'amazon'),
+    const offers = [
+      createOffer('offer-1', 'prod-1', 'amazon', 'Amazon', 2000, 0, 2, 4.0),
+      createOffer('offer-2', 'prod-2', 'bestbuy', 'Best Buy', 1500, 0, 5, 4.8),
     ];
-    mockRepository.findAll.mockResolvedValue(products);
+    mockOfferRepository.findByProductIds.mockResolvedValue(offers);
 
-    const query = new SearchProductsQuery(
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      'price-high',
-    );
+    const query = new SearchProductsQuery('product', 'rating');
     const result = await service.execute(query);
 
-    expect(result.products[0].price.value).toBe(300);
-    expect(result.products[1].price.value).toBe(200);
-    expect(result.products[2].price.value).toBe(100);
-  });
-
-  it('should paginate results', async () => {
-    const products = Array.from({ length: 25 }, (_, i) =>
-      createTestProduct(`id-${i}`, `Product ${i}`, 100 + i, 'amazon'),
-    );
-    mockRepository.findAll.mockResolvedValue(products);
-
-    const query = new SearchProductsQuery(
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      1,
-      10,
-    );
-    const result = await service.execute(query);
-
-    expect(result.products).toHaveLength(10);
-    expect(result.total).toBe(25);
-    expect(result.page).toBe(1);
-    expect(result.limit).toBe(10);
-    expect(result.totalPages).toBe(3);
-  });
-
-  it('should paginate to second page', async () => {
-    const products = Array.from({ length: 25 }, (_, i) =>
-      createTestProduct(`id-${i}`, `Product ${i}`, 100 + i, 'amazon'),
-    );
-    mockRepository.findAll.mockResolvedValue(products);
-
-    const query = new SearchProductsQuery(
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      2,
-      10,
-    );
-    const result = await service.execute(query);
-
-    expect(result.products).toHaveLength(10);
-    expect(result.page).toBe(2);
-    expect(result.totalPages).toBe(3);
-  });
-
-  it('should combine all filters', async () => {
-    const products = [
-      createTestProduct('1', 'Laptop Dell', 1000, 'amazon'),
-      createTestProduct('2', 'Laptop HP', 800, 'amazon'),
-      createTestProduct('3', 'Mouse', 20, 'amazon'),
-      createTestProduct('4', 'Laptop Lenovo', 1200, 'mercadolibre'),
-    ];
-    mockRepository.findAll.mockResolvedValue(products);
-
-    const query = new SearchProductsQuery(
-      'laptop',
-      800,
-      1100,
-      ['amazon'],
-      'price-low',
-      1,
-      20,
-    );
-    const result = await service.execute(query);
-
-    expect(result.products).toHaveLength(2);
-    expect(result.products[0].name.value).toBe('Laptop HP');
-    expect(result.products[1].name.value).toBe('Laptop Dell');
+    expect(result.products[0].canonicalProductId).toBe('product-b');
+    expect(result.products[1].canonicalProductId).toBe('product-a');
   });
 });

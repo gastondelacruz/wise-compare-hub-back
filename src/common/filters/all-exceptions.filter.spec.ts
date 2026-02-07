@@ -2,7 +2,6 @@ import { ArgumentsHost, HttpException, HttpStatus } from '@nestjs/common';
 import { AllExceptionsFilter } from './all-exceptions.filter';
 import { InvalidCredentialsError } from '@contexts/auth/domain/exceptions/invalid-credentials.error';
 import { InvalidTokenError } from '@contexts/auth/domain/exceptions/invalid-token.error';
-import { ProductNotFoundError } from '@contexts/product/domain/exceptions/product-not-found.error';
 
 describe('AllExceptionsFilter', () => {
   let filter: AllExceptionsFilter;
@@ -28,19 +27,6 @@ describe('AllExceptionsFilter', () => {
   });
 
   describe('Domain exceptions', () => {
-    it('should handle ProductNotFoundError with 404', () => {
-      const error = new ProductNotFoundError('product-123');
-
-      filter.catch(error, mockArgumentsHost);
-
-      expect(mockResponse.status).toHaveBeenCalledWith(HttpStatus.NOT_FOUND);
-      expect(mockResponse.json).toHaveBeenCalledWith({
-        statusCode: HttpStatus.NOT_FOUND,
-        message: 'Product with ID product-123 not found',
-        error: 'Not Found',
-      });
-    });
-
     it('should handle InvalidCredentialsError with 401', () => {
       const error = new InvalidCredentialsError();
 

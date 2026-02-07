@@ -1,7 +1,7 @@
-export class Source {
+export class CanonicalProductId {
   constructor(public readonly value: string) {
     if (!value || value.trim().length === 0) {
-      throw new Error('Source cannot be empty');
+      throw new Error('CanonicalProductId cannot be empty');
     }
   }
 }

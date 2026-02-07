@@ -1,42 +1,38 @@
+export type SortOption = 'relevance' | 'price_asc' | 'price_desc' | 'rating';
+
 export class SearchProductsQuery {
   constructor(
     public readonly q?: string,
+    public readonly sort?: SortOption,
     public readonly minPrice?: number,
     public readonly maxPrice?: number,
-    public readonly sources?: string[],
-    public readonly sort?: string,
-    public readonly page?: number,
-    public readonly limit?: number,
-    public readonly userId?: string,
+    public readonly vendors?: string[],
   ) {}
 
-  static fromDto(
-    dto: {
-      q?: string;
-      minPrice?: number;
-      maxPrice?: number;
-      sources?: string | string[];
-      sort?: string;
-      page?: number;
-      limit?: number;
-    },
-    userId?: string,
-  ): SearchProductsQuery {
-    // Handle sources transformation
-    let sourcesArray: string[] | undefined;
-    if (dto.sources) {
-      sourcesArray = Array.isArray(dto.sources) ? dto.sources : [dto.sources];
-    }
+  static fromDto(dto: {
+    q?: string;
+    sort?: string;
+    minPrice?: number;
+    maxPrice?: number;
+    vendors?: string[];
+  }): SearchProductsQuery {
+    const validSorts: SortOption[] = [
+      'relevance',
+      'price_asc',
+      'price_desc',
+      'rating',
+    ];
+    const sort =
+      dto.sort && validSorts.includes(dto.sort as SortOption)
+        ? (dto.sort as SortOption)
+        : 'relevance';
 
     return new SearchProductsQuery(
       dto.q,
+      sort,
       dto.minPrice,
       dto.maxPrice,
-      sourcesArray,
-      dto.sort,
-      dto.page ? Number(dto.page) : undefined,
-      dto.limit ? Number(dto.limit) : undefined,
-      userId,
+      dto.vendors,
     );
   }
 }

@@ -1,55 +1,45 @@
 import { Product } from './product.entity';
 import { ProductId } from './product-id.vo';
-import { ProductName } from './product-name.vo';
-import { Price } from './price.vo';
-import { Source } from './source.vo';
+import { CanonicalProductId } from './canonical-product-id.vo';
 
 describe('Product', () => {
-  const createTestProduct = (overrides?: {
-    id?: string;
-    name?: string;
-    price?: number;
-    source?: string;
-  }): Product => {
-    return new Product(
-      new ProductId(overrides?.id ?? 'product-123'),
-      new ProductName(overrides?.name ?? 'Test Product'),
-      new Price(overrides?.price ?? 100),
-      new Source(overrides?.source ?? 'amazon'),
+  it('should create a valid Product', () => {
+    const product = new Product(
+      new ProductId('prod-1'),
+      new CanonicalProductId('apple-macbook-pro-14-m3'),
+      'Apple MacBook Pro 14" M3',
+      'Laptops',
+      'https://cdn.example.com/macbook-pro-m3.jpg',
     );
-  };
 
-  it('should create product with all fields', () => {
-    const product = createTestProduct({
-      id: 'product-1',
-      name: 'Laptop Dell',
-      price: 999.99,
-      source: 'amazon',
-    });
-
-    expect(product.id.value).toBe('product-1');
-    expect(product.name.value).toBe('Laptop Dell');
-    expect(product.price.value).toBe(999.99);
-    expect(product.source.value).toBe('amazon');
+    expect(product.id.value).toBe('prod-1');
+    expect(product.canonicalProductId.value).toBe('apple-macbook-pro-14-m3');
+    expect(product.name).toBe('Apple MacBook Pro 14" M3');
+    expect(product.category).toBe('Laptops');
+    expect(product.imageUrl).toBe('https://cdn.example.com/macbook-pro-m3.jpg');
   });
 
-  it('should match text query in name', () => {
-    const product = createTestProduct({ name: 'Laptop Dell XPS' });
-    expect(product.matchesText('laptop')).toBe(true);
-    expect(product.matchesText('Dell')).toBe(true);
-    expect(product.matchesText('XPS')).toBe(true);
-    expect(product.matchesText('notfound')).toBe(false);
+  it('should throw error when name is empty', () => {
+    expect(() => {
+      new Product(
+        new ProductId('prod-1'),
+        new CanonicalProductId('canonical-1'),
+        '',
+        'Category',
+        'https://example.com/image.jpg',
+      );
+    }).toThrow('Product name cannot be empty');
   });
 
-  it('should match text query case-insensitively', () => {
-    const product = createTestProduct({ name: 'Laptop Dell' });
-    expect(product.matchesText('LAPTOP')).toBe(true);
-    expect(product.matchesText('dell')).toBe(true);
-  });
-
-  it('should match source', () => {
-    const product = createTestProduct({ source: 'amazon' });
-    expect(product.matchesSource('amazon')).toBe(true);
-    expect(product.matchesSource('mercadolibre')).toBe(false);
+  it('should throw error when category is empty', () => {
+    expect(() => {
+      new Product(
+        new ProductId('prod-1'),
+        new CanonicalProductId('canonical-1'),
+        'Product Name',
+        '',
+        'https://example.com/image.jpg',
+      );
+    }).toThrow('Product category cannot be empty');
   });
 });

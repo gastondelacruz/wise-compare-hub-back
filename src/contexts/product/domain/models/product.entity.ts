@@ -1,24 +1,19 @@
 import { ProductId } from './product-id.vo';
-import { ProductName } from './product-name.vo';
-import { Price } from './price.vo';
-import { Source } from './source.vo';
+import { CanonicalProductId } from './canonical-product-id.vo';
 
 export class Product {
   constructor(
     public readonly id: ProductId,
-    public readonly name: ProductName,
-    public readonly price: Price,
-    public readonly source: Source,
-  ) {}
-
-  matchesText(query: string): boolean {
-    if (!query || query.trim().length === 0) {
-      return true;
+    public readonly canonicalProductId: CanonicalProductId,
+    public readonly name: string,
+    public readonly category: string,
+    public readonly imageUrl: string,
+  ) {
+    if (!name || name.trim().length === 0) {
+      throw new Error('Product name cannot be empty');
     }
-    return this.name.value.toLowerCase().includes(query.toLowerCase());
-  }
-
-  matchesSource(sourceValue: string): boolean {
-    return this.source.value === sourceValue;
+    if (!category || category.trim().length === 0) {
+      throw new Error('Product category cannot be empty');
+    }
   }
 }

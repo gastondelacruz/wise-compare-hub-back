@@ -1,57 +1,108 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { Product } from '@contexts/product/domain/models/product.entity';
-import { SearchProductsResponseDto as ApplicationSearchProductsResponseDto } from '@contexts/product/application/dto/search-products-response.dto';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import {
+  SearchProductsResponseDto as ApplicationSearchProductsResponseDto,
+  ProductSearchResultDto as ApplicationProductSearchResultDto,
+} from '@contexts/product/application/dto/search-products-response.dto';
 
-export class ProductResponseDto {
+export class PriceRangeResponseDto {
   @ApiProperty()
-  id: string;
+  min: number;
+
+  @ApiProperty()
+  max: number;
+
+  @ApiProperty()
+  currency: string;
+}
+
+export class OffersSummaryResponseDto {
+  @ApiProperty()
+  offersCount: number;
+
+  @ApiProperty()
+  bestPrice: number;
+
+  @ApiProperty()
+  fastestDeliveryDays: number;
+}
+
+export class BadgesResponseDto {
+  @ApiProperty()
+  isBestPrice: boolean;
+
+  @ApiProperty()
+  isFastestDelivery: boolean;
+
+  @ApiProperty()
+  isPopular: boolean;
+}
+
+export class ProductSearchResultResponseDto {
+  @ApiProperty()
+  canonicalProductId: string;
 
   @ApiProperty()
   name: string;
 
   @ApiProperty()
-  price: number;
+  category: string;
 
   @ApiProperty()
-  source: string;
+  imageUrl: string;
 
-  static fromDomain(product: Product): ProductResponseDto {
-    return {
-      id: product.id.value,
-      name: product.name.value,
-      price: product.price.value,
-      source: product.source.value,
-    };
-  }
+  @ApiProperty({ type: PriceRangeResponseDto })
+  priceRange: PriceRangeResponseDto;
+
+  @ApiProperty({ type: OffersSummaryResponseDto })
+  offersSummary: OffersSummaryResponseDto;
+
+  @ApiProperty({ type: BadgesResponseDto })
+  badges: BadgesResponseDto;
 }
 
 export class SearchProductsResponseDto {
-  @ApiProperty({ type: [ProductResponseDto] })
-  products: ProductResponseDto[];
+  @ApiPropertyOptional()
+  query?: string;
 
   @ApiProperty()
   total: number;
 
-  @ApiProperty()
-  page: number;
-
-  @ApiProperty()
-  limit: number;
-
-  @ApiProperty()
-  totalPages: number;
+  @ApiProperty({ type: [ProductSearchResultResponseDto] })
+  products: ProductSearchResultResponseDto[];
 
   static fromApplication(
     dto: ApplicationSearchProductsResponseDto,
   ): SearchProductsResponseDto {
     return {
-      products: dto.products.map((product) =>
-        ProductResponseDto.fromDomain(product),
-      ),
+      query: dto.query,
       total: dto.total,
-      page: dto.page,
-      limit: dto.limit,
-      totalPages: dto.totalPages,
+      products: dto.products.map((product) => this.mapProduct(product)),
+    };
+  }
+
+  private static mapProduct(
+    product: ApplicationProductSearchResultDto,
+  ): ProductSearchResultResponseDto {
+    return {
+      canonicalProductId: product.canonicalProductId,
+      name: product.name,
+      category: product.category,
+      imageUrl: product.imageUrl,
+      priceRange: {
+        min: product.priceRange.min,
+        max: product.priceRange.max,
+        currency: product.priceRange.currency,
+      },
+      offersSummary: {
+        offersCount: product.offersSummary.offersCount,
+        bestPrice: product.offersSummary.bestPrice,
+        fastestDeliveryDays: product.offersSummary.fastestDeliveryDays,
+      },
+      badges: {
+        isBestPrice: product.badges.isBestPrice,
+        isFastestDelivery: product.badges.isFastestDelivery,
+        isPopular: product.badges.isPopular,
+      },
     };
   }
 }
