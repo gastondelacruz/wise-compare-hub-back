@@ -5,7 +5,7 @@ import { GetProductByIdService } from '@contexts/product/application/use-cases/g
 import { GetRecentSearchesService } from '@contexts/product/application/use-cases/get-recent-searches.service';
 import { InMemoryProductRepository } from './adapters/persistence/in-memory-product.repository';
 import { InMemoryRecentSearchRepository } from './adapters/persistence/in-memory-recent-search.repository';
-import { TokenDecoderService } from './adapters/http/token-decoder.service';
+import { JwtAuthGuard } from '@common/guards/jwt-auth.guard';
 
 @Module({
   controllers: [ProductsController],
@@ -30,7 +30,7 @@ import { TokenDecoderService } from './adapters/http/token-decoder.service';
       provide: 'RecentSearchRepository',
       useClass: InMemoryRecentSearchRepository,
     },
-    TokenDecoderService,
+    JwtAuthGuard,
   ],
 })
 export class ProductModule {}

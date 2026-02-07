@@ -1,5 +1,6 @@
 import { SearchProductsService } from './search-products.service';
 import { ProductRepository } from '../ports/output/product.repository';
+import { RecentSearchRepository } from '../ports/output/recent-search.repository';
 import { SearchProductsQuery } from '../dto/search-products-query';
 import { Product } from '@contexts/product/domain/models/product.entity';
 import { ProductId } from '@contexts/product/domain/models/product-id.vo';
@@ -10,6 +11,7 @@ import { Source } from '@contexts/product/domain/models/source.vo';
 describe('SearchProductsService', () => {
   let service: SearchProductsService;
   let mockRepository: jest.Mocked<ProductRepository>;
+  let mockRecentSearchRepository: jest.Mocked<RecentSearchRepository>;
 
   const createTestProduct = (
     id: string,
@@ -29,7 +31,16 @@ describe('SearchProductsService', () => {
     mockRepository = {
       findAll: jest.fn(),
     };
-    service = new SearchProductsService(mockRepository);
+    mockRecentSearchRepository = {
+      findByUserId: jest.fn(),
+      findGlobal: jest.fn(),
+      save: jest.fn(),
+      saveGlobal: jest.fn(),
+    };
+    service = new SearchProductsService(
+      mockRepository,
+      mockRecentSearchRepository,
+    );
   });
 
   it('should return all products when no filters applied', async () => {

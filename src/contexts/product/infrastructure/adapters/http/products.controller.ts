@@ -6,7 +6,7 @@ import {
   Inject,
   HttpCode,
   HttpStatus,
-  NotFoundException,
+  UseGuards,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -25,13 +25,12 @@ import {
   ProductResponseDto,
 } from './dto/search-products-response.dto';
 import { RecentSearchesResponseDto } from './dto/recent-searches-response.dto';
-import { Token } from '@contexts/auth/infrastructure/adapters/http/decorators/token.decorator';
-import { TokenDecoderService } from './token-decoder.service';
-import { RecentSearchRepository } from '@contexts/product/application/ports/output/recent-search.repository';
-import { UserId } from '@contexts/auth/domain/models/user-id.vo';
+import { JwtAuthGuard } from '@common/guards/jwt-auth.guard';
+import { CurrentUser } from '@common/decorators/current-user.decorator';
 
 @ApiTags('products')
 @Controller('products')
+@UseGuards(JwtAuthGuard)
 export class ProductsController {
   constructor(
     @Inject('SearchProductsUseCase')
@@ -40,9 +39,6 @@ export class ProductsController {
     private readonly getProductByIdUseCase: GetProductByIdUseCase,
     @Inject('GetRecentSearchesUseCase')
     private readonly getRecentSearchesUseCase: GetRecentSearchesUseCase,
-    @Inject('RecentSearchRepository')
-    private readonly recentSearchRepository: RecentSearchRepository,
-    private readonly tokenDecoder: TokenDecoderService,
   ) {}
 
   @Get('recent-searches')
@@ -59,14 +55,12 @@ export class ProductsController {
     type: RecentSearchesResponseDto,
   })
   async getRecentSearches(
-    @Token() token: string | null,
+    @CurrentUser() userId?: string,
   ): Promise<RecentSearchesResponseDto> {
-    const userId = this.tokenDecoder.decodeUserId(token);
-    const searches = await this.getRecentSearchesUseCase.execute(userId);
-
-    return {
-      searches,
-    };
+    const searches = await this.getRecentSearchesUseCase.execute(
+      userId || null,
+    );
+    return RecentSearchesResponseDto.fromDomain(searches);
   }
 
   @Get('search')
@@ -88,50 +82,11 @@ export class ProductsController {
   })
   async search(
     @Query() dto: SearchProductsDto,
-    @Token() token: string | null,
+    @CurrentUser() userId?: string,
   ): Promise<SearchProductsResponseDto> {
-    let sourcesArray: string[] | undefined;
-    if (dto.sources) {
-      if (Array.isArray(dto.sources)) {
-        sourcesArray = dto.sources;
-      } else if (typeof dto.sources === 'string') {
-        sourcesArray = [dto.sources];
-      }
-    }
-
-    const query = new SearchProductsQuery(
-      dto.q,
-      dto.minPrice,
-      dto.maxPrice,
-      sourcesArray,
-      dto.sort,
-      dto.page ? Number(dto.page) : undefined,
-      dto.limit ? Number(dto.limit) : undefined,
-    );
-
+    const query = SearchProductsQuery.fromDto(dto, userId);
     const result = await this.searchProductsUseCase.execute(query);
-
-    if (dto.q && result.total > 0) {
-      const userId = this.tokenDecoder.decodeUserId(token);
-      if (userId) {
-        await this.recentSearchRepository.save(new UserId(userId), dto.q);
-      } else {
-        await this.recentSearchRepository.saveGlobal(dto.q);
-      }
-    }
-
-    return {
-      products: result.products.map((product) => ({
-        id: product.id.value,
-        name: product.name.value,
-        price: product.price.value,
-        source: product.source.value,
-      })),
-      total: result.total,
-      page: result.page,
-      limit: result.limit,
-      totalPages: result.totalPages,
-    };
+    return SearchProductsResponseDto.fromApplication(result);
   }
 
   @Get(':productId')
@@ -150,20 +105,7 @@ export class ProductsController {
   async getById(
     @Param('productId') productId: string,
   ): Promise<ProductResponseDto> {
-    try {
-      const product = await this.getProductByIdUseCase.execute(productId);
-
-      return {
-        id: product.id.value,
-        name: product.name.value,
-        price: product.price.value,
-        source: product.source.value,
-      };
-    } catch (error) {
-      if (error instanceof NotFoundException) {
-        throw error;
-      }
-      throw error;
-    }
+    const product = await this.getProductByIdUseCase.execute(productId);
+    return ProductResponseDto.fromDomain(product);
   }
 }

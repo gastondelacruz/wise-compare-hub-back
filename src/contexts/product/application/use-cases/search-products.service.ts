@@ -3,7 +3,9 @@ import { SearchProductsUseCase } from '../ports/input/search-products-use-case';
 import { SearchProductsQuery } from '../dto/search-products-query';
 import { SearchProductsResponseDto } from '../dto/search-products-response.dto';
 import { ProductRepository } from '../ports/output/product.repository';
+import { RecentSearchRepository } from '../ports/output/recent-search.repository';
 import { Product } from '@contexts/product/domain/models/product.entity';
+import { UserId } from '@contexts/auth/domain/models/user-id.vo';
 import { PAGINATION } from '@common/constants/business-rules';
 
 @Injectable()
@@ -11,6 +13,8 @@ export class SearchProductsService implements SearchProductsUseCase {
   constructor(
     @Inject('ProductRepository')
     private readonly productRepository: ProductRepository,
+    @Inject('RecentSearchRepository')
+    private readonly recentSearchRepository: RecentSearchRepository,
   ) {}
 
   async execute(
@@ -25,6 +29,18 @@ export class SearchProductsService implements SearchProductsUseCase {
     const paginated = this.applyPagination(filtered, page, limit);
 
     const totalPages = Math.ceil(filtered.length / limit);
+
+    // Save search query to recent searches if query exists and results found
+    if (query.q && filtered.length > 0) {
+      if (query.userId) {
+        await this.recentSearchRepository.save(
+          new UserId(query.userId),
+          query.q,
+        );
+      } else {
+        await this.recentSearchRepository.saveGlobal(query.q);
+      }
+    }
 
     return new SearchProductsResponseDto(
       paginated,
