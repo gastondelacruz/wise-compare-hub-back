@@ -285,4 +285,149 @@ describe('ProductsController (e2e)', () => {
         });
     });
   });
+
+  describe('GET /api/products/recent-searches', () => {
+    it('should return empty array when no token provided', () => {
+      return request(app.getHttpServer())
+        .get('/api/products/recent-searches')
+        .expect(200)
+        .expect((res) => {
+          expect(res.body).toHaveProperty('searches');
+          expect(Array.isArray(res.body.searches)).toBe(true);
+          expect(res.body.searches).toEqual([]);
+        });
+    });
+
+    it('should return empty array when invalid token provided', () => {
+      return request(app.getHttpServer())
+        .get('/api/products/recent-searches')
+        .set('Authorization', 'Bearer invalid-token')
+        .expect(200)
+        .expect((res) => {
+          expect(res.body.searches).toEqual([]);
+        });
+    });
+
+    it('should return searches when valid token provided', async () => {
+      const loginResponse = await request(app.getHttpServer())
+        .post('/api/auth/login')
+        .send({
+          email: 'test@example.com',
+          password: 'password123',
+        });
+
+      const token = loginResponse.body.token;
+
+      return request(app.getHttpServer())
+        .get('/api/products/recent-searches')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200)
+        .expect((res) => {
+          expect(res.body).toHaveProperty('searches');
+          expect(Array.isArray(res.body.searches)).toBe(true);
+        });
+    });
+
+    it('should save search query when user searches with q parameter', async () => {
+      const loginResponse = await request(app.getHttpServer())
+        .post('/api/auth/login')
+        .send({
+          email: 'admin@example.com',
+          password: 'admin123',
+        });
+
+      const token = loginResponse.body.token;
+
+      await request(app.getHttpServer())
+        .get('/api/products/search')
+        .set('Authorization', `Bearer ${token}`)
+        .query({ q: 'monitor' })
+        .expect(200);
+
+      const recentSearchesResponse = await request(app.getHttpServer())
+        .get('/api/products/recent-searches')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      expect(recentSearchesResponse.body.searches).toContain('monitor');
+    });
+
+    it('should save multiple searches in reverse order', async () => {
+      const loginResponse = await request(app.getHttpServer())
+        .post('/api/auth/login')
+        .send({
+          email: 'admin@example.com',
+          password: 'admin123',
+        });
+
+      const token = loginResponse.body.token;
+
+      await request(app.getHttpServer())
+        .get('/api/products/search')
+        .set('Authorization', `Bearer ${token}`)
+        .query({ q: 'laptop' })
+        .expect(200);
+
+      await request(app.getHttpServer())
+        .get('/api/products/search')
+        .set('Authorization', `Bearer ${token}`)
+        .query({ q: 'mouse' })
+        .expect(200);
+
+      await request(app.getHttpServer())
+        .get('/api/products/search')
+        .set('Authorization', `Bearer ${token}`)
+        .query({ q: 'keyboard' })
+        .expect(200);
+
+      const recentSearchesResponse = await request(app.getHttpServer())
+        .get('/api/products/recent-searches')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      expect(
+        recentSearchesResponse.body.searches.length,
+      ).toBeGreaterThanOrEqual(3);
+      expect(recentSearchesResponse.body.searches[0]).toBe('keyboard');
+      expect(recentSearchesResponse.body.searches[1]).toBe('mouse');
+      expect(recentSearchesResponse.body.searches[2]).toBe('laptop');
+    });
+
+    it('should not save search when q parameter is not provided', async () => {
+      const loginResponse = await request(app.getHttpServer())
+        .post('/api/auth/login')
+        .send({
+          email: 'test@example.com',
+          password: 'password123',
+        });
+
+      const token = loginResponse.body.token;
+
+      await request(app.getHttpServer())
+        .get('/api/products/search')
+        .set('Authorization', `Bearer ${token}`)
+        .query({ minPrice: 100 })
+        .expect(200);
+
+      const recentSearchesResponse = await request(app.getHttpServer())
+        .get('/api/products/recent-searches')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      expect(recentSearchesResponse.body.searches).not.toContain('100');
+    });
+
+    it('should not save search when user is not authenticated', async () => {
+      await request(app.getHttpServer())
+        .get('/api/products/search')
+        .query({ q: 'laptop' })
+        .expect(200);
+
+      const recentSearchesResponse = await request(app.getHttpServer())
+        .get('/api/products/recent-searches')
+        .expect(200);
+
+      expect(recentSearchesResponse.body.searches).toEqual([]);
+    });
+  });
 });

@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { ProductsController } from './products.controller';
 import { SearchProductsUseCase } from '@contexts/product/application/ports/input/search-products-use-case';
 import { GetProductByIdUseCase } from '@contexts/product/application/ports/input/get-product-by-id-use-case';
+import { GetRecentSearchesUseCase } from '@contexts/product/application/ports/input/get-recent-searches-use-case';
 import { SearchProductsResponseDto as ApplicationResponseDto } from '@contexts/product/application/dto/search-products-response.dto';
 import { Product } from '@contexts/product/domain/models/product.entity';
 import { ProductId } from '@contexts/product/domain/models/product-id.vo';
@@ -9,11 +10,16 @@ import { ProductName } from '@contexts/product/domain/models/product-name.vo';
 import { Price } from '@contexts/product/domain/models/price.vo';
 import { Source } from '@contexts/product/domain/models/source.vo';
 import { NotFoundException } from '@nestjs/common';
+import { TokenDecoderService } from './token-decoder.service';
+import { RecentSearchRepository } from '@contexts/product/application/ports/output/recent-search.repository';
 
 describe('ProductsController', () => {
   let controller: ProductsController;
   let mockSearchUseCase: jest.Mocked<SearchProductsUseCase>;
   let mockGetByIdUseCase: jest.Mocked<GetProductByIdUseCase>;
+  let mockGetRecentSearchesUseCase: jest.Mocked<GetRecentSearchesUseCase>;
+  let mockTokenDecoder: jest.Mocked<TokenDecoderService>;
+  let mockRecentSearchRepository: jest.Mocked<RecentSearchRepository>;
 
   const createTestProduct = (
     id: string,
@@ -36,6 +42,16 @@ describe('ProductsController', () => {
     mockGetByIdUseCase = {
       execute: jest.fn(),
     };
+    mockGetRecentSearchesUseCase = {
+      execute: jest.fn(),
+    };
+    mockTokenDecoder = {
+      decodeUserId: jest.fn(),
+    };
+    mockRecentSearchRepository = {
+      findByUserId: jest.fn(),
+      save: jest.fn(),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       controllers: [ProductsController],
@@ -47,6 +63,18 @@ describe('ProductsController', () => {
         {
           provide: 'GetProductByIdUseCase',
           useValue: mockGetByIdUseCase,
+        },
+        {
+          provide: 'GetRecentSearchesUseCase',
+          useValue: mockGetRecentSearchesUseCase,
+        },
+        {
+          provide: 'RecentSearchRepository',
+          useValue: mockRecentSearchRepository,
+        },
+        {
+          provide: TokenDecoderService,
+          useValue: mockTokenDecoder,
         },
       ],
     }).compile();
@@ -62,12 +90,16 @@ describe('ProductsController', () => {
     const products = [createTestProduct('1', 'Laptop', 1000, 'amazon')];
     const response = new ApplicationResponseDto(products, 1, 1, 20, 1);
     mockSearchUseCase.execute.mockResolvedValue(response);
+    mockTokenDecoder.decodeUserId.mockReturnValue(null);
 
-    const result = await controller.search({
-      q: 'laptop',
-      page: 1,
-      limit: 20,
-    });
+    const result = await controller.search(
+      {
+        q: 'laptop',
+        page: 1,
+        limit: 20,
+      },
+      null,
+    );
 
     expect(result.products).toHaveLength(1);
     expect(result.products[0].id).toBe('1');
@@ -88,7 +120,7 @@ describe('ProductsController', () => {
     const response = new ApplicationResponseDto(products, 2, 1, 20, 1);
     mockSearchUseCase.execute.mockResolvedValue(response);
 
-    const result = await controller.search({});
+    const result = await controller.search({}, null);
 
     expect(result.products).toHaveLength(2);
     expect(result.products[0]).toEqual({
@@ -102,6 +134,57 @@ describe('ProductsController', () => {
       name: 'Product 2',
       price: 200,
       source: 'mercadolibre',
+    });
+  });
+
+  describe('search - recent searches saving', () => {
+    it('should save search query when user is authenticated and q is provided', async () => {
+      const products = [createTestProduct('1', 'Laptop', 1000, 'amazon')];
+      const response = new ApplicationResponseDto(products, 1, 1, 20, 1);
+      mockSearchUseCase.execute.mockResolvedValue(response);
+      mockTokenDecoder.decodeUserId.mockReturnValue('user-123');
+      mockRecentSearchRepository.save.mockResolvedValue();
+
+      await controller.search({ q: 'laptop' }, 'valid-token');
+
+      expect(mockTokenDecoder.decodeUserId).toHaveBeenCalledWith('valid-token');
+      expect(mockRecentSearchRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({ value: 'user-123' }),
+        'laptop',
+      );
+    });
+
+    it('should not save search when q is not provided', async () => {
+      const products = [createTestProduct('1', 'Laptop', 1000, 'amazon')];
+      const response = new ApplicationResponseDto(products, 1, 1, 20, 1);
+      mockSearchUseCase.execute.mockResolvedValue(response);
+      mockTokenDecoder.decodeUserId.mockReturnValue('user-123');
+
+      await controller.search({}, 'valid-token');
+
+      expect(mockRecentSearchRepository.save).not.toHaveBeenCalled();
+    });
+
+    it('should not save search when user is not authenticated', async () => {
+      const products = [createTestProduct('1', 'Laptop', 1000, 'amazon')];
+      const response = new ApplicationResponseDto(products, 1, 1, 20, 1);
+      mockSearchUseCase.execute.mockResolvedValue(response);
+      mockTokenDecoder.decodeUserId.mockReturnValue(null);
+
+      await controller.search({ q: 'laptop' }, null);
+
+      expect(mockRecentSearchRepository.save).not.toHaveBeenCalled();
+    });
+
+    it('should not save search when token is invalid', async () => {
+      const products = [createTestProduct('1', 'Laptop', 1000, 'amazon')];
+      const response = new ApplicationResponseDto(products, 1, 1, 20, 1);
+      mockSearchUseCase.execute.mockResolvedValue(response);
+      mockTokenDecoder.decodeUserId.mockReturnValue(null);
+
+      await controller.search({ q: 'laptop' }, 'invalid-token');
+
+      expect(mockRecentSearchRepository.save).not.toHaveBeenCalled();
     });
   });
 
@@ -130,6 +213,45 @@ describe('ProductsController', () => {
         NotFoundException,
       );
       expect(mockGetByIdUseCase.execute).toHaveBeenCalledWith('999');
+    });
+  });
+
+  describe('getRecentSearches', () => {
+    it('should return empty array when no token provided', async () => {
+      mockTokenDecoder.decodeUserId.mockReturnValue(null);
+      mockGetRecentSearchesUseCase.execute.mockResolvedValue([]);
+
+      const result = await controller.getRecentSearches(null);
+
+      expect(result.searches).toEqual([]);
+      expect(mockTokenDecoder.decodeUserId).toHaveBeenCalledWith(null);
+      expect(mockGetRecentSearchesUseCase.execute).toHaveBeenCalledWith(null);
+    });
+
+    it('should return searches when valid token provided', async () => {
+      const token = 'mock-jwt-token';
+      const userId = 'user-123';
+      const searches = ['laptop', 'mouse', 'keyboard'];
+      mockTokenDecoder.decodeUserId.mockReturnValue(userId);
+      mockGetRecentSearchesUseCase.execute.mockResolvedValue(searches);
+
+      const result = await controller.getRecentSearches(token);
+
+      expect(result.searches).toEqual(searches);
+      expect(mockTokenDecoder.decodeUserId).toHaveBeenCalledWith(token);
+      expect(mockGetRecentSearchesUseCase.execute).toHaveBeenCalledWith(userId);
+    });
+
+    it('should return empty array when token is invalid', async () => {
+      const token = 'invalid-token';
+      mockTokenDecoder.decodeUserId.mockReturnValue(null);
+      mockGetRecentSearchesUseCase.execute.mockResolvedValue([]);
+
+      const result = await controller.getRecentSearches(token);
+
+      expect(result.searches).toEqual([]);
+      expect(mockTokenDecoder.decodeUserId).toHaveBeenCalledWith(token);
+      expect(mockGetRecentSearchesUseCase.execute).toHaveBeenCalledWith(null);
     });
   });
 });

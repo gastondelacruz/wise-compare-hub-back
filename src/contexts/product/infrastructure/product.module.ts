@@ -2,7 +2,10 @@ import { Module } from '@nestjs/common';
 import { ProductsController } from './adapters/http/products.controller';
 import { SearchProductsService } from '@contexts/product/application/use-cases/search-products.service';
 import { GetProductByIdService } from '@contexts/product/application/use-cases/get-product-by-id.service';
+import { GetRecentSearchesService } from '@contexts/product/application/use-cases/get-recent-searches.service';
 import { InMemoryProductRepository } from './adapters/persistence/in-memory-product.repository';
+import { InMemoryRecentSearchRepository } from './adapters/persistence/in-memory-recent-search.repository';
+import { TokenDecoderService } from './adapters/http/token-decoder.service';
 
 @Module({
   controllers: [ProductsController],
@@ -16,9 +19,18 @@ import { InMemoryProductRepository } from './adapters/persistence/in-memory-prod
       useClass: GetProductByIdService,
     },
     {
+      provide: 'GetRecentSearchesUseCase',
+      useClass: GetRecentSearchesService,
+    },
+    {
       provide: 'ProductRepository',
       useClass: InMemoryProductRepository,
     },
+    {
+      provide: 'RecentSearchRepository',
+      useClass: InMemoryRecentSearchRepository,
+    },
+    TokenDecoderService,
   ],
 })
 export class ProductModule {}
