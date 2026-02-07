@@ -11,6 +11,8 @@
 3. 🚫 **Domain = Pure TypeScript**: NO framework dependencies in domain
 4. ✅ **Validate Before Complete**: Run `pnpm verify` - all must pass
 5. 📍 **Constants Only**: Never hardcode business values
+6. 🎯 **Controllers = Thin Layer**: Only coordinate, never contain logic
+7. 🛡️ **Exception Filters**: Controllers NEVER handle exceptions
 
 **Quick Decision Tree**:
 
@@ -18,6 +20,8 @@
 Business Logic? → Domain Layer (pure TS, test first)
 Use Case/Orchestration? → Application Layer (ports, test with mocks)
 HTTP/DB/External? → Infrastructure Layer (adapters, integration tests)
+Token/Auth Logic? → Guard + Decorator (NOT in controller)
+Exception Handling? → ExceptionFilter (NOT in controller)
 ```
 
 ---
@@ -33,6 +37,10 @@ HTTP/DB/External? → Infrastructure Layer (adapters, integration tests)
 - ❌ Hardcode business values (use constants)
 - ❌ Expose sensitive data in responses
 - ❌ Skip validation (`pnpm verify`)
+- ❌ Put business logic in controllers
+- ❌ Handle exceptions in controllers (use ExceptionFilters)
+- ❌ Inject repositories directly in controllers
+- ❌ Decode tokens or perform auth logic in controllers
 
 ---
 
@@ -52,7 +60,7 @@ src/contexts/{context}/
 │   └── dto/           # Commands/Queries
 └── infrastructure/      # 🟡 Adapters (Framework specific)
     ├── adapters/
-    │   ├── http/      # Controllers + DTOs
+    │   ├── http/      # Controllers + DTOs + Guards + Filters
     │   └── persistence/ # Repositories + ORM
     └── {context}.module.ts
 
@@ -207,9 +215,297 @@ describe('CreateProductService', () => {
 
 ### Infrastructure Layer (Adapters)
 
+#### Controller Rules (CRITICAL)
+
+**Controllers ONLY**:
+
+- ✅ Receive HTTP requests
+- ✅ Validate DTOs (class-validator)
+- ✅ Map DTO → Command/Query
+- ✅ Call Use Case
+- ✅ Map Domain → Response DTO
+- ✅ Return HTTP response
+
+**Controllers NEVER**:
+
+- ❌ Contain business logic
+- ❌ Handle exceptions (use ExceptionFilters)
+- ❌ Inject repositories directly
+- ❌ Decode tokens (use Guards/Decorators)
+- ❌ Save data directly
+- ❌ Transform complex data structures
+- ❌ Make decisions based on domain data
+
+#### Bad vs Good Controller Examples
+
+```typescript
+// ❌ BAD - Controller doing too much
+@Controller('products')
+export class ProductsController {
+  constructor(
+    @Inject('SearchProductsUseCase') private useCase: SearchProductsUseCase,
+    @Inject('RecentSearchRepository') private repo: RecentSearchRepository, // ❌ Repository injection
+    private tokenDecoder: TokenDecoderService, // ❌ Business logic service
+  ) {}
+
+  @Get('search')
+  async search(@Query() dto: SearchProductsDto, @Token() token: string) {
+    // ❌ Complex transformation logic in controller
+    let sourcesArray: string[] | undefined;
+    if (dto.sources) {
+      if (Array.isArray(dto.sources)) {
+        sourcesArray = dto.sources;
+      } else if (typeof dto.sources === 'string') {
+        sourcesArray = [dto.sources];
+      }
+    }
+
+    const query = new SearchProductsQuery(
+      dto.q,
+      dto.minPrice,
+      dto.maxPrice,
+      sourcesArray,
+    );
+    const result = await this.useCase.execute(query);
+
+    // ❌ Business logic - deciding when to save search
+    if (dto.q && result.total > 0) {
+      const userId = this.tokenDecoder.decodeUserId(token); // ❌ Token decoding
+      if (userId) {
+        await this.repo.save(new UserId(userId), dto.q); // ❌ Direct repository call
+      } else {
+        await this.repo.saveGlobal(dto.q);
+      }
+    }
+
+    // ❌ Exception handling in controller
+    try {
+      return this.mapToDto(result);
+    } catch (error) {
+      if (error instanceof NotFoundException) throw error;
+      throw error;
+    }
+  }
+
+  @Get(':id')
+  async getById(@Param('id') id: string) {
+    // ❌ Try-catch in controller
+    try {
+      const product = await this.getByIdUseCase.execute(id);
+      return {
+        id: product.id.value,
+        name: product.name.value,
+      };
+    } catch (error) {
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+      throw error;
+    }
+  }
+}
+
+// ✅ GOOD - Clean controller
+@Controller('products')
+export class ProductsController {
+  constructor(
+    @Inject('CreateProductUseCase')
+    private readonly createUseCase: CreateProductUseCase,
+    @Inject('SearchProductsUseCase')
+    private readonly searchUseCase: SearchProductsUseCase,
+    @Inject('GetProductByIdUseCase')
+    private readonly getByIdUseCase: GetProductByIdUseCase,
+  ) {}
+
+  @Post()
+  async create(@Body() dto: CreateProductDto): Promise<ProductResponseDto> {
+    // ✅ Simple: DTO → Command → Use Case → Response
+    const command = new CreateProductCommand(dto.name, dto.price);
+    const product = await this.createUseCase.execute(command);
+    return ProductResponseDto.fromDomain(product);
+  }
+
+  @Get('search')
+  async search(
+    @Query() dto: SearchProductsDto,
+    @CurrentUser() userId?: string, // ✅ Use Guard + Custom Decorator
+  ): Promise<SearchProductsResponseDto> {
+    // ✅ Complex transformation moved to Query static factory
+    const query = SearchProductsQuery.fromDto(dto, userId);
+
+    // ✅ All business logic is in the use case (including saving search)
+    const result = await this.searchUseCase.execute(query);
+
+    // ✅ Simple mapping to response
+    return SearchProductsResponseDto.fromDomain(result);
+  }
+
+  @Get(':id')
+  async getById(@Param('id') id: string): Promise<ProductResponseDto> {
+    // ✅ No try-catch - ExceptionFilter handles domain exceptions
+    const product = await this.getByIdUseCase.execute(id);
+    return ProductResponseDto.fromDomain(product);
+  }
+}
+```
+
+#### DTO Factory Pattern
+
+```typescript
+// ✅ Move complex transformations to static factory methods
+export class SearchProductsQuery {
+  constructor(
+    public readonly searchTerm?: string,
+    public readonly minPrice?: number,
+    public readonly maxPrice?: number,
+    public readonly sources?: string[],
+    public readonly userId?: string,
+  ) {}
+
+  // ✅ Complex logic here, not in controller
+  static fromDto(dto: SearchProductsDto, userId?: string): SearchProductsQuery {
+    // Handle sources transformation
+    let sourcesArray: string[] | undefined;
+    if (dto.sources) {
+      sourcesArray = Array.isArray(dto.sources) ? dto.sources : [dto.sources];
+    }
+
+    return new SearchProductsQuery(
+      dto.q,
+      dto.minPrice,
+      dto.maxPrice,
+      sourcesArray,
+      userId,
+    );
+  }
+}
+
+// ✅ Response mapping in static method
+export class ProductResponseDto {
+  id: string;
+  name: string;
+  price: number;
+
+  static fromDomain(product: Product): ProductResponseDto {
+    return {
+      id: product.id.value,
+      name: product.name.value,
+      price: product.price.value,
+    };
+  }
+}
+```
+
+#### Exception Filters (Handle ALL Exceptions)
+
+```typescript
+// ✅ Global exception filter
+@Catch()
+export class AllExceptionsFilter implements ExceptionFilter {
+  catch(exception: unknown, host: ArgumentsHost) {
+    const ctx = host.switchToHttp();
+    const response = ctx.getResponse();
+
+    // Domain exceptions
+    if (exception instanceof ProductNotFoundError) {
+      return response.status(404).json({
+        statusCode: 404,
+        message: exception.message,
+        error: 'Not Found',
+      });
+    }
+
+    if (exception instanceof InvalidPriceError) {
+      return response.status(400).json({
+        statusCode: 400,
+        message: exception.message,
+        error: 'Bad Request',
+      });
+    }
+
+    // NestJS HTTP exceptions
+    if (exception instanceof HttpException) {
+      return response
+        .status(exception.getStatus())
+        .json(exception.getResponse());
+    }
+
+    // Unknown errors
+    console.error('Unhandled exception:', exception);
+    return response.status(500).json({
+      statusCode: 500,
+      message: 'Internal server error',
+    });
+  }
+}
+
+// Register globally in main.ts
+app.useGlobalFilters(new AllExceptionsFilter());
+```
+
+#### Guards and Decorators (Handle Auth)
+
+```typescript
+// ✅ Guard extracts and validates user
+@Injectable()
+export class JwtAuthGuard implements CanActivate {
+  constructor(private jwtService: JwtService) {}
+
+  canActivate(context: ExecutionContext): boolean {
+    const request = context.switchToHttp().getRequest();
+    const token = this.extractToken(request);
+
+    if (!token) {
+      request.user = null; // Optional auth
+      return true;
+    }
+
+    try {
+      const payload = this.jwtService.verify(token);
+      request.user = { id: payload.sub }; // Attach to request
+      return true;
+    } catch {
+      request.user = null;
+      return true;
+    }
+  }
+
+  private extractToken(request: any): string | null {
+    const auth = request.headers.authorization;
+    return auth?.startsWith('Bearer ') ? auth.substring(7) : null;
+  }
+}
+
+// ✅ Custom decorator extracts user from request
+export const CurrentUser = createParamDecorator(
+  (data: unknown, ctx: ExecutionContext): string | undefined => {
+    const request = ctx.switchToHttp().getRequest();
+    return request.user?.id; // Already validated by guard
+  },
+);
+
+// ✅ Usage in controller
+@Controller('products')
+@UseGuards(JwtAuthGuard) // Apply guard
+export class ProductsController {
+  @Get('search')
+  async search(
+    @Query() dto: SearchProductsDto,
+    @CurrentUser() userId?: string, // ✅ Clean, no token decoding
+  ) {
+    const query = SearchProductsQuery.fromDto(dto, userId);
+    const result = await this.searchUseCase.execute(query);
+    return SearchProductsResponseDto.fromDomain(result);
+  }
+}
+```
+
+#### Complete Infrastructure Example
+
 ```typescript
 // HTTP Adapter (Controller)
 @Controller('products')
+@UseGuards(JwtAuthGuard)
 export class ProductsController {
   constructor(
     @Inject('CreateProductUseCase')
@@ -220,7 +516,7 @@ export class ProductsController {
   async create(@Body() dto: CreateProductDto): Promise<ProductResponseDto> {
     const cmd = new CreateProductCommand(dto.name, dto.price);
     const product = await this.createUseCase.execute(cmd);
-    return { id: product.id.value, name: product.name.value };
+    return ProductResponseDto.fromDomain(product);
   }
 }
 
@@ -263,6 +559,7 @@ export class TypeOrmProductRepository implements ProductRepository {
   providers: [
     { provide: 'CreateProductUseCase', useClass: CreateProductService },
     { provide: 'ProductRepository', useClass: TypeOrmProductRepository },
+    JwtAuthGuard,
   ],
 })
 export class ProductModule {}
@@ -274,7 +571,11 @@ export class ProductModule {}
 - ✅ Use NestJS decorators here
 - ✅ Map between Domain ↔ Infrastructure
 - ✅ Validate all inputs (DTOs)
+- ✅ Thin controllers - only coordinate
+- ✅ ExceptionFilters handle all errors
+- ✅ Guards handle authentication
 - ❌ NO business logic here
+- ❌ NO exception handling in controllers
 
 ---
 
@@ -338,6 +639,8 @@ import { CreateProductDto } from '../../infrastructure/...'; // NEVER!
 - [ ] `pnpm verify` passes (lint, build, tests)?
 - [ ] No hardcoded values?
 - [ ] Dependencies flow inward?
+- [ ] Controllers are thin (no logic)?
+- [ ] Exceptions handled by filters?
 
 ---
 
@@ -432,16 +735,19 @@ it('should apply discount via HTTP', async () => {
   expect(result.price).toBeLessThan(100);
 });
 
-// 🟢 GREEN - Implement controller
+// 🟢 GREEN - Implement clean controller
 @Patch(':id/discount')
 async applyDiscount(
   @Param('id') id: string,
   @Body() dto: ApplyDiscountDto,
-) {
-  const cmd = new ApplyDiscountCommand(id, dto.percentage);
-  const product = await this.useCase.execute(cmd);
-  return this.toDto(product);
+): Promise<ProductResponseDto> {
+  // ✅ Simple: DTO → Command → Use Case → Response
+  const command = new ApplyDiscountCommand(id, dto.percentage);
+  const product = await this.useCase.execute(command);
+  return ProductResponseDto.fromDomain(product);
 }
+
+// ✅ ExceptionFilter handles ProductNotFoundError automatically
 ```
 
 ### Step 4: E2E
@@ -477,6 +783,14 @@ it('should apply discount end-to-end', () => {
 - Application = Use cases (framework agnostic)
 - Infrastructure = Adapters (NestJS, TypeORM, etc.)
 
+**Controllers**:
+
+- Thin layer - only coordinate
+- No business logic
+- No exception handling (use filters)
+- No direct repository access
+- No token decoding (use guards)
+
 **TDD**:
 
 - Always test first (Red-Green-Refactor)
@@ -489,8 +803,9 @@ it('should apply discount end-to-end', () => {
 - No `any` type
 - No hardcoded values
 - All DTOs validated
-- All errors handled
+- All errors handled by filters
 - Dependencies flow inward
+- Controllers stay thin
 
 **Security**:
 
@@ -506,9 +821,12 @@ it('should apply discount end-to-end', () => {
 
 **Business rule validation?** → Domain layer
 **Orchestrating multiple operations?** → Application layer
-**HTTP request handling?** → Infrastructure layer (Controller)
+**HTTP request handling?** → Infrastructure layer (Thin Controller)
 **Database access?** → Infrastructure layer (Repository)
+**Token validation?** → Infrastructure layer (Guard)
+**Exception mapping?** → Infrastructure layer (Filter)
+**Complex DTO transformation?** → Static factory method in Command/Query
 **Shared across contexts?** → Shared kernel
 **Technical utility?** → Common
 
-**Remember**: Test FIRST, implement SECOND, validate ALWAYS.
+**Remember**: Test FIRST, implement SECOND, validate ALWAYS, controllers THIN.
