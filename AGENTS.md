@@ -229,12 +229,35 @@ describe('CreateProductService', () => {
 **Controllers NEVER**:
 
 - ❌ Contain business logic
-- ❌ Handle exceptions (use ExceptionFilters)
+- ❌ Handle exceptions (ALL exceptions handled by ExceptionFilters - MANDATORY)
+- ❌ Use try-catch blocks (let exceptions propagate to ExceptionFilters)
+- ❌ Throw HttpException manually (ExceptionFilters map domain errors)
 - ❌ Inject repositories directly
 - ❌ Decode tokens (use Guards/Decorators)
 - ❌ Save data directly
 - ❌ Transform complex data structures
 - ❌ Make decisions based on domain data
+
+**Exception Handling Pattern**:
+
+```typescript
+// ✅ CORRECT - Let exceptions propagate
+async getById(@Param('id') id: string): Promise<ProductResponseDto> {
+  const product = await this.useCase.execute(id);
+  return ProductResponseDto.fromDomain(product);
+}
+
+// ❌ WRONG - Handling exceptions in controller
+async getById(@Param('id') id: string): Promise<ProductResponseDto> {
+  try {
+    const product = await this.useCase.execute(id);
+    return ProductResponseDto.fromDomain(product);
+  } catch (error) {
+    // ❌ NEVER do this - ExceptionFilter handles it
+    throw new NotFoundException();
+  }
+}
+```
 
 #### Bad vs Good Controller Examples
 
@@ -396,52 +419,172 @@ export class ProductResponseDto {
 }
 ```
 
-#### Exception Filters (Handle ALL Exceptions)
+#### Exception Filters (Handle ALL Exceptions) - MANDATORY
+
+**CRITICAL RULE**: **ALL exceptions MUST be handled by ExceptionFilters. Controllers NEVER handle exceptions.**
+
+**Why ExceptionFilters?**:
+
+- ✅ Centralized error handling
+- ✅ Consistent error responses
+- ✅ Separation of concerns (controllers stay thin)
+- ✅ Easy to maintain and test
+- ✅ Domain exceptions mapped to HTTP status codes
+
+**Location**: `src/contexts/{context}/infrastructure/adapters/http/filters/` or `src/common/filters/` for global filters
+
+**Implementation**:
 
 ```typescript
-// ✅ Global exception filter
+// ✅ Global exception filter (src/common/filters/all-exceptions.filter.ts)
+import {
+  ExceptionFilter,
+  Catch,
+  ArgumentsHost,
+  HttpException,
+  HttpStatus,
+} from '@nestjs/common';
+import { Response } from 'express';
+
 @Catch()
 export class AllExceptionsFilter implements ExceptionFilter {
   catch(exception: unknown, host: ArgumentsHost) {
     const ctx = host.switchToHttp();
-    const response = ctx.getResponse();
+    const response = ctx.getResponse<Response>();
 
-    // Domain exceptions
+    // Domain exceptions - Map to HTTP status codes
     if (exception instanceof ProductNotFoundError) {
-      return response.status(404).json({
-        statusCode: 404,
+      return response.status(HttpStatus.NOT_FOUND).json({
+        statusCode: HttpStatus.NOT_FOUND,
         message: exception.message,
         error: 'Not Found',
       });
     }
 
     if (exception instanceof InvalidPriceError) {
-      return response.status(400).json({
-        statusCode: 400,
+      return response.status(HttpStatus.BAD_REQUEST).json({
+        statusCode: HttpStatus.BAD_REQUEST,
         message: exception.message,
         error: 'Bad Request',
       });
     }
 
-    // NestJS HTTP exceptions
+    if (exception instanceof InvalidCredentialsError) {
+      return response.status(HttpStatus.UNAUTHORIZED).json({
+        statusCode: HttpStatus.UNAUTHORIZED,
+        message: exception.message,
+        error: 'Unauthorized',
+      });
+    }
+
+    // Validation errors from Value Objects
+    if (
+      exception instanceof Error &&
+      (exception.message.includes('cannot be empty') ||
+        exception.message.includes('Invalid email format') ||
+        exception.message.includes('Invalid format'))
+    ) {
+      return response.status(HttpStatus.BAD_REQUEST).json({
+        statusCode: HttpStatus.BAD_REQUEST,
+        message: exception.message,
+        error: 'Bad Request',
+      });
+    }
+
+    // NestJS HTTP exceptions (from ValidationPipe, etc.)
     if (exception instanceof HttpException) {
       return response
         .status(exception.getStatus())
         .json(exception.getResponse());
     }
 
-    // Unknown errors
+    // Unknown/unexpected errors
     console.error('Unhandled exception:', exception);
-    return response.status(500).json({
-      statusCode: 500,
+    return response.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
+      statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
       message: 'Internal server error',
+      error: 'Internal Server Error',
     });
   }
 }
 
 // Register globally in main.ts
-app.useGlobalFilters(new AllExceptionsFilter());
+import { AllExceptionsFilter } from '@common/filters/all-exceptions.filter';
+
+async function bootstrap(): Promise<void> {
+  const app = await NestFactory.create(AppModule);
+
+  // ... other configuration ...
+
+  // ✅ Register global exception filter
+  app.useGlobalFilters(new AllExceptionsFilter());
+
+  await app.listen(3000);
+}
 ```
+
+**Domain Exception Classes** (create in domain layer):
+
+```typescript
+// src/contexts/product/domain/exceptions/product-not-found.error.ts
+export class ProductNotFoundError extends Error {
+  constructor(productId: string) {
+    super(`Product with ID ${productId} not found`);
+    this.name = 'ProductNotFoundError';
+  }
+}
+
+// src/contexts/auth/domain/exceptions/invalid-credentials.error.ts
+export class InvalidCredentialsError extends Error {
+  constructor() {
+    super('Invalid credentials');
+    this.name = 'InvalidCredentialsError';
+  }
+}
+```
+
+**Controller Pattern (NO exception handling)**:
+
+```typescript
+// ❌ BAD - Controller handling exceptions
+@Controller('products')
+export class ProductsController {
+  @Get(':id')
+  async getById(@Param('id') id: string) {
+    try {
+      const product = await this.useCase.execute(id);
+      return ProductResponseDto.fromDomain(product);
+    } catch (error) {
+      if (error instanceof ProductNotFoundError) {
+        throw new NotFoundException(error.message);
+      }
+      throw error;
+    }
+  }
+}
+
+// ✅ GOOD - Controller lets exceptions propagate
+@Controller('products')
+export class ProductsController {
+  @Get(':id')
+  async getById(@Param('id') id: string): Promise<ProductResponseDto> {
+    // ✅ No try-catch - ExceptionFilter handles all errors
+    const product = await this.useCase.execute(id);
+    return ProductResponseDto.fromDomain(product);
+  }
+}
+```
+
+**Rules**:
+
+- ✅ ALL exceptions handled by ExceptionFilters
+- ✅ Controllers NEVER use try-catch
+- ✅ Domain exceptions extend Error with descriptive messages
+- ✅ Map domain exceptions to appropriate HTTP status codes
+- ✅ Register ExceptionFilter globally in main.ts
+- ✅ Log unexpected errors for debugging
+- ❌ NEVER handle exceptions in controllers
+- ❌ NEVER throw HttpException from domain/application layers
 
 #### Guards and Decorators (Handle Auth)
 
@@ -639,8 +782,9 @@ import { CreateProductDto } from '../../infrastructure/...'; // NEVER!
 - [ ] `pnpm verify` passes (lint, build, tests)?
 - [ ] No hardcoded values?
 - [ ] Dependencies flow inward?
-- [ ] Controllers are thin (no logic)?
-- [ ] Exceptions handled by filters?
+- [ ] Controllers are thin (no logic, no try-catch)?
+- [ ] ALL exceptions handled by ExceptionFilters (MANDATORY)?
+- [ ] ExceptionFilter registered globally in main.ts?
 
 ---
 
@@ -787,7 +931,8 @@ it('should apply discount end-to-end', () => {
 
 - Thin layer - only coordinate
 - No business logic
-- No exception handling (use filters)
+- No exception handling (ALL exceptions handled by ExceptionFilters - MANDATORY)
+- No try-catch blocks (let exceptions propagate)
 - No direct repository access
 - No token decoding (use guards)
 
@@ -803,7 +948,7 @@ it('should apply discount end-to-end', () => {
 - No `any` type
 - No hardcoded values
 - All DTOs validated
-- All errors handled by filters
+- All errors handled by ExceptionFilters (MANDATORY - no try-catch in controllers)
 - Dependencies flow inward
 - Controllers stay thin
 
@@ -824,7 +969,7 @@ it('should apply discount end-to-end', () => {
 **HTTP request handling?** → Infrastructure layer (Thin Controller)
 **Database access?** → Infrastructure layer (Repository)
 **Token validation?** → Infrastructure layer (Guard)
-**Exception mapping?** → Infrastructure layer (Filter)
+**Exception handling?** → Infrastructure layer (ExceptionFilter - MANDATORY for ALL exceptions)
 **Complex DTO transformation?** → Static factory method in Command/Query
 **Shared across contexts?** → Shared kernel
 **Technical utility?** → Common
