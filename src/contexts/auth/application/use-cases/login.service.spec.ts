@@ -7,6 +7,7 @@ import { User } from '@contexts/auth/domain/models/user.entity';
 import { UserId } from '@contexts/auth/domain/models/user-id.vo';
 import { Email } from '@contexts/auth/domain/models/email.vo';
 import { Password } from '@contexts/auth/domain/models/password.vo';
+import { InvalidCredentialsError } from '@contexts/auth/domain/exceptions/invalid-credentials.error';
 
 describe('LoginService', () => {
   let service: LoginService;
@@ -58,17 +59,17 @@ describe('LoginService', () => {
     expect(mockTokenStore.save).toHaveBeenCalledWith(expect.any(Object));
   });
 
-  it('should throw error when user not found', async () => {
+  it('should throw InvalidCredentialsError when user not found', async () => {
     mockUserRepository.findByEmail.mockResolvedValue(null);
 
     const command = new LoginCommand('notfound@example.com', 'password123');
 
     await expect(service.execute(command)).rejects.toThrow(
-      'Invalid credentials',
+      InvalidCredentialsError,
     );
   });
 
-  it('should throw error when password is incorrect', async () => {
+  it('should throw InvalidCredentialsError when password is incorrect', async () => {
     const user = new User(
       new UserId('user-1'),
       new Email('test@example.com'),
@@ -80,7 +81,7 @@ describe('LoginService', () => {
     const command = new LoginCommand('test@example.com', 'wrong-password');
 
     await expect(service.execute(command)).rejects.toThrow(
-      'Invalid credentials',
+      InvalidCredentialsError,
     );
   });
 });

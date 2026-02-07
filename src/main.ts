@@ -3,12 +3,16 @@ import { ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import type { INestApplication } from '@nestjs/common';
 import { AppModule } from './app.module';
+import { AllExceptionsFilter } from '@common/filters/all-exceptions.filter';
 
 async function bootstrap(): Promise<void> {
   const app: INestApplication = await NestFactory.create(AppModule);
 
   // Global prefix
   app.setGlobalPrefix('api');
+
+  // Global exception filter - handles ALL exceptions
+  app.useGlobalFilters(new AllExceptionsFilter());
 
   // Global validation pipe
   app.useGlobalPipes(

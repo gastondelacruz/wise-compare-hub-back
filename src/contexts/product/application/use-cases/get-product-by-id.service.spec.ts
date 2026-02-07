@@ -5,6 +5,7 @@ import { ProductId } from '@contexts/product/domain/models/product-id.vo';
 import { ProductName } from '@contexts/product/domain/models/product-name.vo';
 import { Price } from '@contexts/product/domain/models/price.vo';
 import { Source } from '@contexts/product/domain/models/source.vo';
+import { ProductNotFoundError } from '@contexts/product/domain/exceptions/product-not-found.error';
 
 describe('GetProductByIdService', () => {
   let service: GetProductByIdService;
@@ -45,10 +46,10 @@ describe('GetProductByIdService', () => {
     );
   });
 
-  it('should throw error when product not found', async () => {
+  it('should throw ProductNotFoundError when product not found', async () => {
     mockRepository.findById.mockResolvedValue(null);
 
-    await expect(service.execute('999')).rejects.toThrow('Product not found');
+    await expect(service.execute('999')).rejects.toThrow(ProductNotFoundError);
     expect(mockRepository.findById).toHaveBeenCalledWith(
       expect.objectContaining({ value: '999' }),
     );

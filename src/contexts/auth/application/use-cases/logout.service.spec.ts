@@ -1,6 +1,7 @@
 import { LogoutService } from './logout.service';
 import { TokenStore } from '../ports/output/token-store';
 import { Token } from '@contexts/auth/domain/models/token.vo';
+import { InvalidTokenError } from '@contexts/auth/domain/exceptions/invalid-token.error';
 
 describe('LogoutService', () => {
   let service: LogoutService;
@@ -27,14 +28,14 @@ describe('LogoutService', () => {
     expect(mockTokenStore.remove).toHaveBeenCalledWith(token);
   });
 
-  it('should throw error when token does not exist', async () => {
+  it('should throw InvalidTokenError when token does not exist', async () => {
     const tokenValue = 'invalid-token';
     const token = new Token(tokenValue);
 
     mockTokenStore.exists.mockResolvedValue(false);
 
     await expect(service.execute(tokenValue)).rejects.toThrow(
-      'Invalid or expired token',
+      InvalidTokenError,
     );
 
     expect(mockTokenStore.exists).toHaveBeenCalledWith(token);

@@ -8,6 +8,7 @@ import { TokenStore } from '../ports/output/token-store';
 import { Email } from '@contexts/auth/domain/models/email.vo';
 import { Password } from '@contexts/auth/domain/models/password.vo';
 import { Token } from '@contexts/auth/domain/models/token.vo';
+import { InvalidCredentialsError } from '@contexts/auth/domain/exceptions/invalid-credentials.error';
 
 @Injectable()
 export class LoginService implements LoginUseCase {
@@ -25,12 +26,12 @@ export class LoginService implements LoginUseCase {
     const user = await this.userRepository.findByEmail(email);
 
     if (!user) {
-      throw new Error('Invalid credentials');
+      throw new InvalidCredentialsError();
     }
 
     const password = new Password(command.password);
     if (!user.verifyPassword(password)) {
-      throw new Error('Invalid credentials');
+      throw new InvalidCredentialsError();
     }
 
     const tokenValue = await this.tokenGenerator.generate(user);

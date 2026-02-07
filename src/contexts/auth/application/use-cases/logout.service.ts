@@ -2,6 +2,7 @@ import { Injectable, Inject } from '@nestjs/common';
 import { LogoutUseCase } from '../ports/input/logout-use-case';
 import { TokenStore } from '../ports/output/token-store';
 import { Token } from '@contexts/auth/domain/models/token.vo';
+import { InvalidTokenError } from '@contexts/auth/domain/exceptions/invalid-token.error';
 
 @Injectable()
 export class LogoutService implements LogoutUseCase {
@@ -15,7 +16,7 @@ export class LogoutService implements LogoutUseCase {
     const exists = await this.tokenStore.exists(tokenVo);
 
     if (!exists) {
-      throw new Error('Invalid or expired token');
+      throw new InvalidTokenError();
     }
 
     await this.tokenStore.remove(tokenVo);
