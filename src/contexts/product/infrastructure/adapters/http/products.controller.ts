@@ -48,7 +48,11 @@ export class ProductsController {
   @Get('recent-searches')
   @HttpCode(HttpStatus.OK)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Get recent search queries for authenticated user' })
+  @ApiOperation({
+    summary: 'Get recent search queries',
+    description:
+      'Returns recent searches for authenticated user if token is provided, otherwise returns global recent searches. Maximum 10 searches.',
+  })
   @ApiResponse({
     status: 200,
     description: 'Recent searches retrieved',
@@ -71,7 +75,7 @@ export class ProductsController {
   @ApiOperation({
     summary: 'Search products with filters and pagination',
     description:
-      'Searches products with optional filters. If authenticated and q parameter is provided, the search query will be saved to recent searches.',
+      'Searches products with optional filters. If q parameter is provided and results are found, the search query will be saved to recent searches (user-specific if authenticated, global otherwise).',
   })
   @ApiResponse({
     status: 200,
@@ -107,10 +111,12 @@ export class ProductsController {
 
     const result = await this.searchProductsUseCase.execute(query);
 
-    if (dto.q) {
+    if (dto.q && result.total > 0) {
       const userId = this.tokenDecoder.decodeUserId(token);
       if (userId) {
         await this.recentSearchRepository.save(new UserId(userId), dto.q);
+      } else {
+        await this.recentSearchRepository.saveGlobal(dto.q);
       }
     }
 

@@ -12,7 +12,7 @@ export class GetRecentSearchesService implements GetRecentSearchesUseCase {
 
   async execute(userId: string | null): Promise<string[]> {
     if (!userId) {
-      return [];
+      return this.recentSearchRepository.findGlobal();
     }
 
     const user = new UserId(userId);

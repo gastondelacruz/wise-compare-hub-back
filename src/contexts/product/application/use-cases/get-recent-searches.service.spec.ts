@@ -8,15 +8,21 @@ describe('GetRecentSearchesService', () => {
   beforeEach(() => {
     mockRepository = {
       findByUserId: jest.fn(),
+      findGlobal: jest.fn(),
       save: jest.fn(),
+      saveGlobal: jest.fn(),
     };
     service = new GetRecentSearchesService(mockRepository);
   });
 
-  it('should return empty array when userId is null', async () => {
+  it('should return global searches when userId is null', async () => {
+    const globalSearches = ['laptop', 'mouse'];
+    mockRepository.findGlobal.mockResolvedValue(globalSearches);
+
     const result = await service.execute(null);
 
-    expect(result).toEqual([]);
+    expect(result).toEqual(globalSearches);
+    expect(mockRepository.findGlobal).toHaveBeenCalled();
     expect(mockRepository.findByUserId).not.toHaveBeenCalled();
   });
 

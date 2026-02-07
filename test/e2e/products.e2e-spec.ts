@@ -287,24 +287,40 @@ describe('ProductsController (e2e)', () => {
   });
 
   describe('GET /api/products/recent-searches', () => {
-    it('should return empty array when no token provided', () => {
+    it('should return global searches when no token provided', async () => {
+      await request(app.getHttpServer())
+        .get('/api/products/search')
+        .query({ q: 'Monitor' })
+        .expect(200)
+        .expect((res) => {
+          expect(res.body.total).toBeGreaterThan(0);
+        });
+
       return request(app.getHttpServer())
         .get('/api/products/recent-searches')
         .expect(200)
         .expect((res) => {
           expect(res.body).toHaveProperty('searches');
           expect(Array.isArray(res.body.searches)).toBe(true);
-          expect(res.body.searches).toEqual([]);
+          expect(res.body.searches).toContain('Monitor');
         });
     });
 
-    it('should return empty array when invalid token provided', () => {
+    it('should return global searches when invalid token provided', async () => {
+      await request(app.getHttpServer())
+        .get('/api/products/search')
+        .query({ q: 'Mouse' })
+        .expect(200)
+        .expect((res) => {
+          expect(res.body.total).toBeGreaterThan(0);
+        });
+
       return request(app.getHttpServer())
         .get('/api/products/recent-searches')
         .set('Authorization', 'Bearer invalid-token')
         .expect(200)
         .expect((res) => {
-          expect(res.body.searches).toEqual([]);
+          expect(res.body.searches).toContain('Mouse');
         });
     });
 
@@ -328,7 +344,7 @@ describe('ProductsController (e2e)', () => {
         });
     });
 
-    it('should save search query when user searches with q parameter', async () => {
+    it('should save search query when user searches with q parameter and results exist', async () => {
       const loginResponse = await request(app.getHttpServer())
         .post('/api/auth/login')
         .send({
@@ -341,15 +357,47 @@ describe('ProductsController (e2e)', () => {
       await request(app.getHttpServer())
         .get('/api/products/search')
         .set('Authorization', `Bearer ${token}`)
-        .query({ q: 'monitor' })
-        .expect(200);
+        .query({ q: 'laptop' })
+        .expect(200)
+        .expect((res) => {
+          expect(res.body.total).toBeGreaterThan(0);
+        });
 
       const recentSearchesResponse = await request(app.getHttpServer())
         .get('/api/products/recent-searches')
         .set('Authorization', `Bearer ${token}`)
         .expect(200);
 
-      expect(recentSearchesResponse.body.searches).toContain('monitor');
+      expect(recentSearchesResponse.body.searches).toContain('laptop');
+    });
+
+    it('should not save search query when no results found', async () => {
+      const loginResponse = await request(app.getHttpServer())
+        .post('/api/auth/login')
+        .send({
+          email: 'admin@example.com',
+          password: 'admin123',
+        });
+
+      const token = loginResponse.body.token;
+
+      await request(app.getHttpServer())
+        .get('/api/products/search')
+        .set('Authorization', `Bearer ${token}`)
+        .query({ q: 'nonexistent-product-xyz-123' })
+        .expect(200)
+        .expect((res) => {
+          expect(res.body.total).toBe(0);
+        });
+
+      const recentSearchesResponse = await request(app.getHttpServer())
+        .get('/api/products/recent-searches')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      expect(recentSearchesResponse.body.searches).not.toContain(
+        'nonexistent-product-xyz-123',
+      );
     });
 
     it('should save multiple searches in reverse order', async () => {
@@ -417,17 +465,68 @@ describe('ProductsController (e2e)', () => {
       expect(recentSearchesResponse.body.searches).not.toContain('100');
     });
 
-    it('should not save search when user is not authenticated', async () => {
+    it('should save global search when user is not authenticated and results exist', async () => {
       await request(app.getHttpServer())
         .get('/api/products/search')
-        .query({ q: 'laptop' })
-        .expect(200);
+        .query({ q: 'Keyboard' })
+        .expect(200)
+        .expect((res) => {
+          expect(res.body.total).toBeGreaterThan(0);
+        });
 
       const recentSearchesResponse = await request(app.getHttpServer())
         .get('/api/products/recent-searches')
         .expect(200);
 
-      expect(recentSearchesResponse.body.searches).toEqual([]);
+      expect(recentSearchesResponse.body.searches).toContain('Keyboard');
+    });
+
+    it('should return maximum 10 searches', async () => {
+      const loginResponse = await request(app.getHttpServer())
+        .post('/api/auth/login')
+        .send({
+          email: 'admin@example.com',
+          password: 'admin123',
+        });
+
+      const token = loginResponse.body.token;
+
+      const searchTerms = [
+        'Laptop',
+        'Mouse',
+        'Keyboard',
+        'Monitor',
+        'Teclado',
+        'Dell',
+        'HP',
+        'Lenovo',
+        'Logitech',
+        'LG',
+        'Gaming',
+        'RGB',
+      ];
+
+      for (const term of searchTerms) {
+        await request(app.getHttpServer())
+          .get('/api/products/search')
+          .set('Authorization', `Bearer ${token}`)
+          .query({ q: term })
+          .expect(200)
+          .expect((res) => {
+            expect(res.body.total).toBeGreaterThan(0);
+          });
+      }
+
+      const recentSearchesResponse = await request(app.getHttpServer())
+        .get('/api/products/recent-searches')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      expect(recentSearchesResponse.body.searches.length).toBe(10);
+      expect(recentSearchesResponse.body.searches[0]).toBe('RGB');
+      expect(recentSearchesResponse.body.searches).toContain('Gaming');
+      expect(recentSearchesResponse.body.searches).toContain('LG');
+      expect(recentSearchesResponse.body.searches).toContain('Logitech');
     });
   });
 });
