@@ -1,15 +1,25 @@
 import { Offer } from './offer.entity';
 import { OfferId } from './offer-id.vo';
-import { ProductId } from './product-id.vo';
-import { Vendor } from './vendor.entity';
-import { VendorId } from './vendor-id.vo';
-import { Price } from './price.vo';
-import { DeliveryDays } from './delivery-days.vo';
-import { Rating } from './rating.vo';
+import { ProductId } from '@contexts/product/domain/models/product-id.vo';
+import { Vendor } from '@contexts/vendor/domain/models/vendor.entity';
+import { VendorId } from '@contexts/vendor/domain/models/vendor-id.vo';
+import { Price } from '@contexts/product/domain/models/price.vo';
+import { DeliveryDays } from '@contexts/product/domain/models/delivery-days.vo';
+import { Rating } from '@contexts/product/domain/models/rating.vo';
 
 describe('Offer', () => {
-  const createVendor = (id: string, name: string, isOfficial: boolean) => {
-    return new Vendor(new VendorId(id), name, isOfficial);
+  const createVendor = (
+    id: string,
+    name: string,
+    isOfficial: boolean,
+  ): Vendor => {
+    return new Vendor(
+      new VendorId(id),
+      name,
+      isOfficial,
+      `https://cdn.wisecompare.com/vendors/${id}.svg`,
+      true,
+    );
   };
 
   it('should create a valid Offer', () => {

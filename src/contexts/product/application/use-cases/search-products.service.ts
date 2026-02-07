@@ -11,7 +11,7 @@ import {
 import { ProductRepository } from '../ports/output/product.repository';
 import { OfferRepository } from '../ports/output/offer.repository';
 import { Product } from '@contexts/product/domain/models/product.entity';
-import { Offer } from '@contexts/product/domain/models/offer.entity';
+import { Offer } from '@contexts/offer/domain/models/offer.entity';
 import { PRODUCT_RULES } from '@contexts/product/domain/constants/product-rules';
 
 @Injectable()

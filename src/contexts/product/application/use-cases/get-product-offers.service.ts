@@ -15,7 +15,7 @@ import { ProductRepository } from '../ports/output/product.repository';
 import { OfferRepository } from '../ports/output/offer.repository';
 import { CanonicalProductId } from '@contexts/product/domain/models/canonical-product-id.vo';
 import { ProductNotFoundError } from '@contexts/product/domain/exceptions/product-not-found.error';
-import { Offer } from '@contexts/product/domain/models/offer.entity';
+import { Offer } from '@contexts/offer/domain/models/offer.entity';
 
 @Injectable()
 export class GetProductOffersService implements GetProductOffersUseCase {

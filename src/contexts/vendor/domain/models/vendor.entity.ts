@@ -5,6 +5,8 @@ export class Vendor {
     public readonly id: VendorId,
     public readonly name: string,
     public readonly isOfficial: boolean,
+    public readonly logoUrl: string,
+    public readonly enabled: boolean,
   ) {
     if (!name || name.trim().length === 0) {
       throw new Error('Vendor name cannot be empty');

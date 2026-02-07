@@ -4,10 +4,10 @@ import { OfferRepository } from '../ports/output/offer.repository';
 import { Product } from '@contexts/product/domain/models/product.entity';
 import { ProductId } from '@contexts/product/domain/models/product-id.vo';
 import { CanonicalProductId } from '@contexts/product/domain/models/canonical-product-id.vo';
-import { Offer } from '@contexts/product/domain/models/offer.entity';
-import { OfferId } from '@contexts/product/domain/models/offer-id.vo';
-import { Vendor } from '@contexts/product/domain/models/vendor.entity';
-import { VendorId } from '@contexts/product/domain/models/vendor-id.vo';
+import { Offer } from '@contexts/offer/domain/models/offer.entity';
+import { OfferId } from '@contexts/offer/domain/models/offer-id.vo';
+import { Vendor } from '@contexts/vendor/domain/models/vendor.entity';
+import { VendorId } from '@contexts/vendor/domain/models/vendor-id.vo';
 import { Price } from '@contexts/product/domain/models/price.vo';
 import { DeliveryDays } from '@contexts/product/domain/models/delivery-days.vo';
 import { Rating } from '@contexts/product/domain/models/rating.vo';
@@ -32,8 +32,18 @@ describe('GetProductOffersService', () => {
     );
   };
 
-  const createVendor = (id: string, name: string, isOfficial: boolean) => {
-    return new Vendor(new VendorId(id), name, isOfficial);
+  const createVendor = (
+    id: string,
+    name: string,
+    isOfficial: boolean,
+  ): Vendor => {
+    return new Vendor(
+      new VendorId(id),
+      name,
+      isOfficial,
+      `https://cdn.wisecompare.com/vendors/${id}.svg`,
+      true,
+    );
   };
 
   const createOffer = (

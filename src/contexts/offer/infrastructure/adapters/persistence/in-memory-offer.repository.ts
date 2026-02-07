@@ -1,10 +1,10 @@
 import { Injectable } from '@nestjs/common';
-import { OfferRepository } from '@contexts/product/application/ports/output/offer.repository';
-import { Offer } from '@contexts/product/domain/models/offer.entity';
+import { OfferRepository } from '@contexts/offer/application/ports/output/offer.repository';
+import { Offer } from '@contexts/offer/domain/models/offer.entity';
 import { ProductId } from '@contexts/product/domain/models/product-id.vo';
-import { OfferId } from '@contexts/product/domain/models/offer-id.vo';
-import { Vendor } from '@contexts/product/domain/models/vendor.entity';
-import { VendorId } from '@contexts/product/domain/models/vendor-id.vo';
+import { OfferId } from '@contexts/offer/domain/models/offer-id.vo';
+import { Vendor } from '@contexts/vendor/domain/models/vendor.entity';
+import { VendorId } from '@contexts/vendor/domain/models/vendor-id.vo';
 import { Price } from '@contexts/product/domain/models/price.vo';
 import { DeliveryDays } from '@contexts/product/domain/models/delivery-days.vo';
 import { Rating } from '@contexts/product/domain/models/rating.vo';
@@ -108,7 +108,13 @@ export class InMemoryOfferRepository implements OfferRepository {
       const offer = new Offer(
         new OfferId(mock.id),
         new ProductId(mock.productId),
-        new Vendor(new VendorId(mock.vendorId), mock.vendorName, false),
+        new Vendor(
+          new VendorId(mock.vendorId),
+          mock.vendorName,
+          false,
+          `https://cdn.wisecompare.com/vendors/${mock.vendorId}.svg`,
+          true,
+        ),
         new Price(mock.basePrice, mock.shipping),
         new DeliveryDays(mock.deliveryDays),
         new Rating(mock.rating),

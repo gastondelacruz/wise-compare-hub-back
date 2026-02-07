@@ -1,9 +1,9 @@
 import { InMemoryOfferRepository } from './in-memory-offer.repository';
-import { Offer } from '@contexts/product/domain/models/offer.entity';
-import { OfferId } from '@contexts/product/domain/models/offer-id.vo';
+import { Offer } from '@contexts/offer/domain/models/offer.entity';
+import { OfferId } from '@contexts/offer/domain/models/offer-id.vo';
 import { ProductId } from '@contexts/product/domain/models/product-id.vo';
-import { Vendor } from '@contexts/product/domain/models/vendor.entity';
-import { VendorId } from '@contexts/product/domain/models/vendor-id.vo';
+import { Vendor } from '@contexts/vendor/domain/models/vendor.entity';
+import { VendorId } from '@contexts/vendor/domain/models/vendor-id.vo';
 import { Price } from '@contexts/product/domain/models/price.vo';
 import { DeliveryDays } from '@contexts/product/domain/models/delivery-days.vo';
 
@@ -14,7 +14,13 @@ describe('InMemoryOfferRepository', () => {
     return new Offer(
       new OfferId(id),
       new ProductId(productId),
-      new Vendor(new VendorId('amazon'), 'Amazon', false),
+      new Vendor(
+        new VendorId('amazon'),
+        'Amazon',
+        false,
+        'https://cdn.wisecompare.com/vendors/amazon.svg',
+        true,
+      ),
       new Price(1000, 0),
       new DeliveryDays(2),
     );
