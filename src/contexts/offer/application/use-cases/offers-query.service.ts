@@ -1,5 +1,5 @@
 import { Injectable, Inject } from '@nestjs/common';
-import { GetProductOffersUseCase } from '../ports/input/get-product-offers-use-case';
+import { OffersQueryUseCase } from '../ports/input/offers-query-use-case';
 import {
   GetProductOffersResponseDto,
   OfferDto,
@@ -10,15 +10,19 @@ import {
   RatingDto,
   FlagsDto,
   CtaDto,
-} from '../dto/get-product-offers-response.dto';
-import { ProductRepository } from '../ports/output/product.repository';
-import { OfferRepository } from '@contexts/offer/application/ports/output/offer.repository';
+} from '@contexts/product/application/dto/get-product-offers-response.dto';
+import { ProductRepository } from '@contexts/product/application/ports/output/product.repository';
+import { OfferRepository } from '../ports/output/offer.repository';
 import { CanonicalProductId } from '@contexts/product/domain/models/canonical-product-id.vo';
 import { ProductNotFoundError } from '@contexts/product/domain/exceptions/product-not-found.error';
 import { Offer } from '@contexts/offer/domain/models/offer.entity';
 
+/**
+ * Service responsible for querying existing offers for a product.
+ * This service only reads from repositories and does not fetch or ingest offers.
+ */
 @Injectable()
-export class GetProductOffersService implements GetProductOffersUseCase {
+export class OffersQueryService implements OffersQueryUseCase {
   constructor(
     @Inject('ProductRepository')
     private readonly productRepository: ProductRepository,

@@ -1,98 +1,286 @@
+# Wise Compare Hub API
+
 <p align="center">
   <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
 </p>
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+REST API backend for product and offer comparison across multiple vendors, built with NestJS following Hexagonal Architecture (DDD) and TDD.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+## 📋 Description
 
-## Description
+Wise Compare Hub is a REST API that enables:
+- Search for canonical products with aggregated offers from multiple vendors
+- Compare offers for specific products
+- User authentication management
+- Recent search history (user-specific and global)
+- Vendor information retrieval
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+## 🏗️ Architecture
 
-## Project setup
+The project follows **Hexagonal Architecture (DDD)** with clear layer separation:
+
+```
+src/contexts/{context}/
+├── domain/              # 🔵 Pure Business Logic (no dependencies)
+│   ├── models/         # Entities, Value Objects
+│   ├── services/       # Domain Services
+│   └── constants/      # Business rules
+├── application/         # 🟢 Use Cases (Framework agnostic)
+│   ├── ports/
+│   │   ├── input/     # Use case interfaces
+│   │   └── output/    # Repository interfaces
+│   ├── use-cases/     # Implementations
+│   └── dto/           # Commands/Queries
+└── infrastructure/      # 🟡 Adapters (Framework specific)
+    ├── adapters/
+    │   ├── http/      # Controllers + DTOs + Guards + Filters
+    │   └── persistence/ # Repositories + ORM
+    └── {context}.module.ts
+
+src/shared/              # Code shared across contexts
+src/common/              # Technical utilities + constants
+```
+
+**Dependency Rule**: `Infrastructure → Application → Domain` (NEVER reverse)
+
+## 🎯 Contexts (Bounded Contexts)
+
+### 🔐 Auth (Authentication)
+- User login with email and password
+- Logout with token invalidation
+- JWT token generation and validation
+- Session management
+
+### 📦 Product (Products)
+- Search for canonical products with aggregated offers
+- Get all offers for a specific product
+- Recent search history (user-specific and global)
+- Aggregation of price, delivery time, and rating information
+
+### 🏪 Vendor (Vendors)
+- List of available vendors
+- Filter by status (enabled/disabled)
+- Vendor information for search filters
+
+### 💰 Offer (Offers)
+- Domain model for product offers
+- Relationship with products and vendors
+- Price, delivery, and rating information
+
+## 🚀 Technologies
+
+- **Framework**: NestJS 11.x
+- **Language**: TypeScript 5.7
+- **Database**: PostgreSQL (TypeORM)
+- **Authentication**: JWT (Passport)
+- **Validation**: class-validator, class-transformer
+- **Documentation**: Swagger/OpenAPI
+- **Testing**: Jest
+- **Package Manager**: pnpm
+- **Security**: bcrypt for passwords, rate limiting with Throttler
+
+## 📦 Installation
 
 ```bash
+# Install dependencies
 $ pnpm install
 ```
 
-## Compile and run the project
+## ⚙️ Configuration
+
+Copy the `.env.example` file to `.env` and update the values:
 
 ```bash
-# development
-$ pnpm run start
+cp .env.example .env
+```
 
-# watch mode
+Then edit `.env` with your actual values. The file should contain the following variables:
+
+```env
+# Server
+PORT=3000
+NODE_ENV=development
+
+# JWT
+JWT_SECRET=your-secret-key
+JWT_EXPIRES_IN=24h
+
+# Database (if using PostgreSQL)
+DB_HOST=localhost
+DB_PORT=5432
+DB_USERNAME=postgres
+DB_PASSWORD=postgres
+DB_DATABASE=wise_compare_hub
+
+# CORS
+ALLOWED_ORIGINS=http://localhost:3000,http://localhost:3001
+
+# MercadoLibre API
+MERCADOLIBRE_CLIENT_ID=your-client-id
+MERCADOLIBRE_CLIENT_SECRET=your-client-secret
+MERCADOLIBRE_OAUTH_TOKEN_URL=https://api.mercadolibre.com/oauth/token
+MERCADOLIBRE_PRODUCTS_SEARCH_URL=https://api.mercadolibre.com/products/search
+```
+
+## 🏃 Running the Application
+
+```bash
+# Development (with watch mode)
 $ pnpm run start:dev
 
-# production mode
+# Production
 $ pnpm run start:prod
+
+# Debug
+$ pnpm run start:debug
 ```
 
-## Run tests
+The API will be available at `http://localhost:3000/api`
+
+## 📚 API Documentation
+
+Once the server is running, Swagger documentation is available at:
+
+```
+http://localhost:3000/api/docs
+```
+
+## 🧪 Testing
+
+The project follows **TDD (Test-Driven Development)** as a mandatory methodology.
 
 ```bash
-# unit tests
+# Run all tests
 $ pnpm run test
 
-# e2e tests
+# Tests in watch mode
+$ pnpm run test:watch
+
+# Coverage
+$ pnpm run test:cov
+
+# E2E tests
 $ pnpm run test:e2e
 
-# test coverage
-$ pnpm run test:cov
+# Debug tests
+$ pnpm run test:debug
 ```
 
-## Deployment
+## ✅ Validation
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
-
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+Before considering a task complete, run:
 
 ```bash
-$ pnpm install -g @nestjs/mau
-$ mau deploy
+$ pnpm verify
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+This command runs:
+1. Lint → Must pass
+2. Format check → Must pass
+3. Security audit → No critical issues
+4. Build → 0 type errors
+5. Unit tests → All pass
+6. E2E tests → All pass
 
-## Resources
+## 📡 Main Endpoints
 
-Check out a few resources that may come in handy when working with NestJS:
+### Authentication
+- `POST /api/auth/login` - Login
+- `POST /api/auth/logout` - Logout (requires token)
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+### Products
+- `GET /api/products/search` - Search products with aggregated offers
+- `GET /api/products/:canonicalProductId/offers` - Get all offers for a product
+- `GET /api/products/recent-searches` - Get recent searches
 
-## Support
+### Vendors
+- `GET /api/vendors` - List available vendors
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+### Health
+- `GET /api/health` - Application status
 
-## Stay in touch
+## 🔒 Security
 
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+- JWT authentication with Bearer tokens
+- Passwords hashed with bcrypt
+- Rate limiting on sensitive endpoints
+- Input validation with class-validator
+- CORS configured
+- Centralized exception handling with ExceptionFilters
 
-## License
+## 🏛️ Design Principles
 
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+### TDD (Test-Driven Development)
+- 🔴 **RED**: Write failing test first
+- 🟢 **GREEN**: Minimal code to pass
+- 🔵 **REFACTOR**: Improve while keeping tests green
+
+### Hexagonal Architecture
+- **Domain Layer**: Pure business logic, no framework dependencies
+- **Application Layer**: Use cases, orchestration, framework agnostic
+- **Infrastructure Layer**: HTTP adapters, persistence, framework specific
+
+### Critical Rules
+- ❌ NEVER use `any`
+- ❌ NEVER hardcode business values (use constants)
+- ❌ NEVER put business logic in controllers
+- ❌ NEVER handle exceptions in controllers (use ExceptionFilters)
+- ✅ Thin controllers: only coordinate
+- ✅ Dependencies flow inward: Infrastructure → Application → Domain
+
+## 📁 Context Structure
+
+Each context follows the same hexagonal structure:
+
+```
+contexts/{context}/
+├── domain/              # Domain models, Value Objects, exceptions
+├── application/         # Use cases, ports, DTOs
+└── infrastructure/      # Controllers, Repositories, NestJS Module
+```
+
+## 🛠️ Available Scripts
+
+```bash
+# Development
+pnpm run start:dev      # Start in development mode with watch
+pnpm run start:debug   # Start in debug mode
+
+# Production
+pnpm run build         # Build the project
+pnpm run start:prod    # Start in production mode
+
+# Code Quality
+pnpm run lint          # Run ESLint
+pnpm run format        # Format code with Prettier
+pnpm run format:check  # Check format without modifying
+
+# Testing
+pnpm run test          # Run unit tests
+pnpm run test:watch    # Tests in watch mode
+pnpm run test:cov      # Tests with coverage
+pnpm run test:e2e      # End-to-end tests
+
+# Full validation
+pnpm run verify        # Run lint, format, audit, build and tests
+```
+
+## 📖 Additional Documentation
+
+- [AGENTS.md](./AGENTS.md) - Complete guide for developers and AI agents
+- [Swagger Docs](http://localhost:3000/api/docs) - Interactive API documentation
+
+## 🤝 Contributing
+
+This project strictly follows the rules defined in `AGENTS.md`. Before contributing:
+
+1. Read `AGENTS.md` completely
+2. Follow TDD: write tests first
+3. Respect hexagonal architecture
+4. Run `pnpm verify` before committing
+5. Keep controllers thin
+6. Use ExceptionFilters for error handling
+
+## 📝 License
+
+This project is private and not licensed for public use.

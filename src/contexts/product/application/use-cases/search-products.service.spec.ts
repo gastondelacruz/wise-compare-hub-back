@@ -2,7 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { SearchProductsService } from './search-products.service';
 import { SearchProductsQuery } from '../dto/search-products-query';
 import { ProductRepository } from '../ports/output/product.repository';
-import { OfferRepository } from '../ports/output/offer.repository';
+import { OfferRepository } from '@contexts/offer/application/ports/output/offer.repository';
 import { RecentSearchRepository } from '../ports/output/recent-search.repository';
 import { Product } from '@contexts/product/domain/models/product.entity';
 import { ProductId } from '@contexts/product/domain/models/product-id.vo';

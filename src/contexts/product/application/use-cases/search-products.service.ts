@@ -9,7 +9,7 @@ import {
   BadgesDto,
 } from '../dto/search-products-response.dto';
 import { ProductRepository } from '../ports/output/product.repository';
-import { OfferRepository } from '../ports/output/offer.repository';
+import { OfferRepository } from '@contexts/offer/application/ports/output/offer.repository';
 import { RecentSearchRepository } from '../ports/output/recent-search.repository';
 import { Product } from '@contexts/product/domain/models/product.entity';
 import { Offer } from '@contexts/offer/domain/models/offer.entity';

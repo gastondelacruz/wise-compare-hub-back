@@ -15,5 +15,6 @@ import { InMemoryVendorRepository } from './adapters/persistence/in-memory-vendo
       useClass: InMemoryVendorRepository,
     },
   ],
+  exports: ['VendorRepository'],
 })
 export class VendorModule {}

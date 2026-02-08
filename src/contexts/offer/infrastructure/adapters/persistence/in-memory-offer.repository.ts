@@ -139,4 +139,18 @@ export class InMemoryOfferRepository implements OfferRepository {
     }
     return Promise.resolve();
   }
+
+  deleteByProductIdAndVendorId(
+    productId: ProductId,
+    vendorId: VendorId,
+  ): Promise<void> {
+    this.offers = this.offers.filter(
+      (offer) =>
+        !(
+          offer.productId.value === productId.value &&
+          offer.vendor.id.value === vendorId.value
+        ),
+    );
+    return Promise.resolve();
+  }
 }

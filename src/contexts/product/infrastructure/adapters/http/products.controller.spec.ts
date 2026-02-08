@@ -1,7 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ProductsController } from './products.controller';
 import { SearchProductsUseCase } from '@contexts/product/application/ports/input/search-products-use-case';
-import { GetProductOffersUseCase } from '@contexts/product/application/ports/input/get-product-offers-use-case';
 import { GetRecentSearchesUseCase } from '@contexts/product/application/ports/input/get-recent-searches-use-case';
 import {
   SearchProductsResponseDto as ApplicationSearchResponseDto,
@@ -10,31 +9,16 @@ import {
   OffersSummaryDto,
   BadgesDto,
 } from '@contexts/product/application/dto/search-products-response.dto';
-import {
-  GetProductOffersResponseDto as ApplicationGetOffersResponseDto,
-  SummaryDto,
-  OfferDto,
-  VendorDto,
-  PricingDto,
-  DeliveryDto,
-  RatingDto,
-  FlagsDto,
-  CtaDto,
-} from '@contexts/product/application/dto/get-product-offers-response.dto';
 import { RecentSearch } from '@contexts/product/domain/models/recent-search.entity';
 import { JwtAuthGuard } from '@common/guards/jwt-auth.guard';
 
 describe('ProductsController', () => {
   let controller: ProductsController;
   let mockSearchUseCase: jest.Mocked<SearchProductsUseCase>;
-  let mockGetOffersUseCase: jest.Mocked<GetProductOffersUseCase>;
   let mockGetRecentSearchesUseCase: jest.Mocked<GetRecentSearchesUseCase>;
 
   beforeEach(async () => {
     mockSearchUseCase = {
-      execute: jest.fn(),
-    };
-    mockGetOffersUseCase = {
       execute: jest.fn(),
     };
     mockGetRecentSearchesUseCase = {
@@ -47,10 +31,6 @@ describe('ProductsController', () => {
         {
           provide: 'SearchProductsUseCase',
           useValue: mockSearchUseCase,
-        },
-        {
-          provide: 'GetProductOffersUseCase',
-          useValue: mockGetOffersUseCase,
         },
         {
           provide: 'GetRecentSearchesUseCase',
@@ -115,73 +95,6 @@ describe('ProductsController', () => {
           q: 'macbook',
           userId: userId,
         }),
-      );
-    });
-  });
-
-  describe('getOffers', () => {
-    it('should return offers for canonical product', async () => {
-      const offers = [
-        new OfferDto(
-          'offer-1',
-          new VendorDto('amazon', 'Amazon', true),
-          new PricingDto(1899, 0, 1899, 'USD'),
-          new DeliveryDto(1),
-          new RatingDto(4.6),
-          new FlagsDto(true, true),
-          new CtaDto('https://amazon.com/product/xyz', 'View offer'),
-        ),
-      ];
-      const response = new ApplicationGetOffersResponseDto(
-        'canonical-1',
-        'MacBook Pro',
-        'https://example.com/image.jpg',
-        new SummaryDto(1, 1899, 1),
-        offers,
-      );
-      mockGetOffersUseCase.execute.mockResolvedValue(response);
-
-      const result = await controller.getOffers('canonical-1', {}, undefined);
-
-      expect(result.canonicalProductId).toBe('canonical-1');
-      expect(result.name).toBe('MacBook Pro');
-      expect(result.offers).toHaveLength(1);
-      expect(result.offers[0].offerId).toBe('offer-1');
-      expect(mockGetOffersUseCase.execute).toHaveBeenCalledWith(
-        'canonical-1',
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-      );
-    });
-
-    it('should pass query parameters to use case', async () => {
-      const response = new ApplicationGetOffersResponseDto(
-        'canonical-1',
-        'Product',
-        'https://example.com/image.jpg',
-        new SummaryDto(0, 0, 0),
-        [],
-      );
-      mockGetOffersUseCase.execute.mockResolvedValue(response);
-
-      await controller.getOffers(
-        'canonical-1',
-        {
-          sort: 'delivery',
-          vendors: ['amazon', 'bestbuy'],
-          preferences: true,
-        },
-        'user-123',
-      );
-
-      expect(mockGetOffersUseCase.execute).toHaveBeenCalledWith(
-        'canonical-1',
-        'delivery',
-        ['amazon', 'bestbuy'],
-        true,
-        'user-123',
       );
     });
   });

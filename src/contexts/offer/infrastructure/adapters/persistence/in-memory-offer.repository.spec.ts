@@ -63,4 +63,68 @@ describe('InMemoryOfferRepository', () => {
     expect(found).toHaveLength(1);
     expect(found[0].productId.value).toBe('prod-1');
   });
+
+  it('should delete offers by product id and vendor id', async () => {
+    const offer1 = createOffer('offer-test-delete-1', 'prod-test-delete');
+    const offer2 = new Offer(
+      new OfferId('offer-test-delete-2'),
+      new ProductId('prod-test-delete'),
+      new Vendor(
+        new VendorId('bestbuy'),
+        'Best Buy',
+        false,
+        'https://cdn.wisecompare.com/vendors/bestbuy.svg',
+        true,
+      ),
+      new Price(1000, 0),
+      new DeliveryDays(2),
+    );
+    await repository.save(offer1);
+    await repository.save(offer2);
+
+    await repository.deleteByProductIdAndVendorId(
+      new ProductId('prod-test-delete'),
+      new VendorId('amazon'),
+    );
+
+    const found = await repository.findByProductIds([
+      new ProductId('prod-test-delete'),
+    ]);
+    expect(found).toHaveLength(1);
+    expect(found[0].vendor.id.value).toBe('bestbuy');
+  });
+
+  it('should not delete offers with different product id', async () => {
+    const offer1 = createOffer('offer-test-1', 'prod-test-1');
+    const offer2 = createOffer('offer-test-2', 'prod-test-2');
+    await repository.save(offer1);
+    await repository.save(offer2);
+
+    await repository.deleteByProductIdAndVendorId(
+      new ProductId('prod-test-1'),
+      new VendorId('amazon'),
+    );
+
+    const found = await repository.findByProductIds([
+      new ProductId('prod-test-2'),
+    ]);
+    expect(found).toHaveLength(1);
+    expect(found[0].productId.value).toBe('prod-test-2');
+  });
+
+  it('should not delete offers with different vendor id', async () => {
+    const offer1 = createOffer('offer-test-vendor', 'prod-test-vendor');
+    await repository.save(offer1);
+
+    await repository.deleteByProductIdAndVendorId(
+      new ProductId('prod-test-vendor'),
+      new VendorId('bestbuy'),
+    );
+
+    const found = await repository.findByProductIds([
+      new ProductId('prod-test-vendor'),
+    ]);
+    expect(found).toHaveLength(1);
+    expect(found[0].vendor.id.value).toBe('amazon');
+  });
 });

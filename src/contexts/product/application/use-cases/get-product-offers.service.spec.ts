@@ -1,6 +1,6 @@
 import { GetProductOffersService } from './get-product-offers.service';
 import { ProductRepository } from '../ports/output/product.repository';
-import { OfferRepository } from '../ports/output/offer.repository';
+import { OfferRepository } from '@contexts/offer/application/ports/output/offer.repository';
 import { Product } from '@contexts/product/domain/models/product.entity';
 import { ProductId } from '@contexts/product/domain/models/product-id.vo';
 import { CanonicalProductId } from '@contexts/product/domain/models/canonical-product-id.vo';

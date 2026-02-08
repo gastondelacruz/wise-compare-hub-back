@@ -9,4 +9,5 @@ export interface ProductRepository {
     canonicalProductId: CanonicalProductId,
   ): Promise<Product[]>;
   findBySearchTerm(searchTerm: string): Promise<Product[]>;
+  save(product: Product): Promise<void>;
 }
