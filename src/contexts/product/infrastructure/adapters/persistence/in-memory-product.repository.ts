@@ -19,28 +19,32 @@ export class InMemoryProductRepository implements ProductRepository {
         canonicalId: 'apple-macbook-pro-14-m3',
         name: 'Apple MacBook Pro 14" M3',
         category: 'Laptops',
-        imageUrl: 'https://cdn.example.com/macbook-pro-m3.jpg',
+        imageUrl:
+          'https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=400&h=300&fit=crop',
       },
       {
         id: 'prod-2',
         canonicalId: 'apple-macbook-pro-14-m3',
         name: 'Apple MacBook Pro 14" M3',
         category: 'Laptops',
-        imageUrl: 'https://cdn.example.com/macbook-pro-m3.jpg',
+        imageUrl:
+          'https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=400&h=300&fit=crop',
       },
       {
         id: 'prod-3',
         canonicalId: 'apple-iphone-15-pro',
         name: 'Apple iPhone 15 Pro',
         category: 'Smartphones',
-        imageUrl: 'https://cdn.example.com/iphone-15-pro.jpg',
+        imageUrl:
+          'https://images.unsplash.com/photo-1591337676887-a217a6970a8a?q=80&w=1160&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
       },
       {
         id: 'prod-4',
         canonicalId: 'dell-xps-15-9530',
         name: 'Dell XPS 15 9530',
         category: 'Laptops',
-        imageUrl: 'https://cdn.example.com/dell-xps-15.jpg',
+        imageUrl:
+          'https://images.unsplash.com/photo-1558317374-067fb5f30001?w=400&h=300&fit=crop',
       },
     ];
 
