@@ -7,15 +7,19 @@ export class SearchProductsQuery {
     public readonly minPrice?: number,
     public readonly maxPrice?: number,
     public readonly vendors?: string[],
+    public readonly userId?: string,
   ) {}
 
-  static fromDto(dto: {
-    q?: string;
-    sort?: string;
-    minPrice?: number;
-    maxPrice?: number;
-    vendors?: string[];
-  }): SearchProductsQuery {
+  static fromDto(
+    dto: {
+      q?: string;
+      sort?: string;
+      minPrice?: number;
+      maxPrice?: number;
+      vendors?: string[];
+    },
+    userId?: string,
+  ): SearchProductsQuery {
     const validSorts: SortOption[] = [
       'relevance',
       'price_asc',
@@ -33,6 +37,7 @@ export class SearchProductsQuery {
       dto.minPrice,
       dto.maxPrice,
       dto.vendors,
+      userId,
     );
   }
 }

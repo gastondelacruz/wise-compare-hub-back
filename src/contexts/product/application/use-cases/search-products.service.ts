@@ -10,8 +10,10 @@ import {
 } from '../dto/search-products-response.dto';
 import { ProductRepository } from '../ports/output/product.repository';
 import { OfferRepository } from '../ports/output/offer.repository';
+import { RecentSearchRepository } from '../ports/output/recent-search.repository';
 import { Product } from '@contexts/product/domain/models/product.entity';
 import { Offer } from '@contexts/offer/domain/models/offer.entity';
+import { RecentSearch } from '@contexts/product/domain/models/recent-search.entity';
 import { PRODUCT_RULES } from '@contexts/product/domain/constants/product-rules';
 
 @Injectable()
@@ -21,6 +23,8 @@ export class SearchProductsService implements SearchProductsUseCase {
     private readonly productRepository: ProductRepository,
     @Inject('OfferRepository')
     private readonly offerRepository: OfferRepository,
+    @Inject('RecentSearchRepository')
+    private readonly recentSearchRepository: RecentSearchRepository,
   ) {}
 
   async execute(
@@ -31,11 +35,17 @@ export class SearchProductsService implements SearchProductsUseCase {
       ? await this.productRepository.findBySearchTerm(query.q)
       : await this.productRepository.findAll();
 
+    // 2. Guardar búsqueda si hay término de búsqueda y productos encontrados
+    if (query.q && products.length > 0) {
+      const recentSearch = new RecentSearch(query.q, query.userId);
+      await this.recentSearchRepository.save(recentSearch);
+    }
+
     if (products.length === 0) {
       return new SearchProductsResponseDto(query.q, 0, []);
     }
 
-    // 2. Agrupar productos por canonicalProductId
+    // 3. Agrupar productos por canonicalProductId
     const productsByCanonicalId = new Map<string, Product[]>();
     for (const product of products) {
       const canonicalId = product.canonicalProductId.value;
@@ -45,12 +55,12 @@ export class SearchProductsService implements SearchProductsUseCase {
       productsByCanonicalId.get(canonicalId)!.push(product);
     }
 
-    // 3. Obtener todas las ofertas para todos los productos
+    // 4. Obtener todas las ofertas para todos los productos
     const allProductIds = products.map((p) => p.id);
     const allOffers =
       await this.offerRepository.findByProductIds(allProductIds);
 
-    // 4. Agrupar ofertas por canonicalProductId
+    // 5. Agrupar ofertas por canonicalProductId
     const offersByCanonicalId = new Map<string, Offer[]>();
     for (const offer of allOffers) {
       const product = products.find(
@@ -65,7 +75,7 @@ export class SearchProductsService implements SearchProductsUseCase {
       }
     }
 
-    // 5. Procesar cada grupo canónico
+    // 6. Procesar cada grupo canónico
     const productResults: ProductSearchResultDto[] = [];
     const offersByCanonicalIdForResults = new Map<string, Offer[]>();
 
@@ -103,10 +113,10 @@ export class SearchProductsService implements SearchProductsUseCase {
       );
     }
 
-    // 6. Calcular badges comparando con otros productos
+    // 7. Calcular badges comparando con otros productos
     this.calculateBadges(productResults);
 
-    // 7. Ordenar resultados
+    // 8. Ordenar resultados
     const sortedResults = this.sortResults(
       productResults,
       query.sort,

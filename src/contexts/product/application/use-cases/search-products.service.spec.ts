@@ -1,7 +1,9 @@
+import { Test, TestingModule } from '@nestjs/testing';
 import { SearchProductsService } from './search-products.service';
 import { SearchProductsQuery } from '../dto/search-products-query';
 import { ProductRepository } from '../ports/output/product.repository';
 import { OfferRepository } from '../ports/output/offer.repository';
+import { RecentSearchRepository } from '../ports/output/recent-search.repository';
 import { Product } from '@contexts/product/domain/models/product.entity';
 import { ProductId } from '@contexts/product/domain/models/product-id.vo';
 import { CanonicalProductId } from '@contexts/product/domain/models/canonical-product-id.vo';
@@ -12,11 +14,13 @@ import { VendorId } from '@contexts/vendor/domain/models/vendor-id.vo';
 import { Price } from '@contexts/product/domain/models/price.vo';
 import { DeliveryDays } from '@contexts/product/domain/models/delivery-days.vo';
 import { Rating } from '@contexts/product/domain/models/rating.vo';
+import { RecentSearch } from '@contexts/product/domain/models/recent-search.entity';
 
 describe('SearchProductsService', () => {
   let service: SearchProductsService;
   let mockProductRepository: jest.Mocked<ProductRepository>;
   let mockOfferRepository: jest.Mocked<OfferRepository>;
+  let mockRecentSearchRepository: jest.Mocked<RecentSearchRepository>;
 
   const createProduct = (
     id: string,
@@ -62,7 +66,7 @@ describe('SearchProductsService', () => {
     );
   };
 
-  beforeEach(() => {
+  beforeEach(async () => {
     mockProductRepository = {
       findAll: jest.fn(),
       findById: jest.fn(),
@@ -72,10 +76,31 @@ describe('SearchProductsService', () => {
     mockOfferRepository = {
       findByProductIds: jest.fn(),
     };
-    service = new SearchProductsService(
-      mockProductRepository,
-      mockOfferRepository,
-    );
+    mockRecentSearchRepository = {
+      findByUserId: jest.fn(),
+      findGlobal: jest.fn(),
+      save: jest.fn(),
+    };
+
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        SearchProductsService,
+        {
+          provide: 'ProductRepository',
+          useValue: mockProductRepository,
+        },
+        {
+          provide: 'OfferRepository',
+          useValue: mockOfferRepository,
+        },
+        {
+          provide: 'RecentSearchRepository',
+          useValue: mockRecentSearchRepository,
+        },
+      ],
+    }).compile();
+
+    service = module.get<SearchProductsService>(SearchProductsService);
   });
 
   it('should return empty results when no products match search term', async () => {
@@ -307,5 +332,63 @@ describe('SearchProductsService', () => {
 
     expect(result.products[0].canonicalProductId).toBe('product-b');
     expect(result.products[1].canonicalProductId).toBe('product-a');
+  });
+
+  it('should save search when search term is provided and user is authenticated', async () => {
+    const userId = 'user-123';
+    const products = [createProduct('prod-1', 'macbook-pro', 'MacBook Pro')];
+    mockProductRepository.findBySearchTerm.mockResolvedValue(products);
+    mockOfferRepository.findByProductIds.mockResolvedValue([]);
+
+    const query = new SearchProductsQuery(
+      'macbook',
+      'relevance',
+      undefined,
+      undefined,
+      undefined,
+      userId,
+    );
+    await service.execute(query);
+
+    expect(mockRecentSearchRepository.save).toHaveBeenCalledTimes(1);
+    const savedSearch = mockRecentSearchRepository.save.mock.calls[0][0];
+    expect(savedSearch).toBeInstanceOf(RecentSearch);
+    expect(savedSearch.searchTerm).toBe('macbook');
+    expect(savedSearch.userId).toBe(userId);
+  });
+
+  it('should save global search when search term is provided and user is not authenticated', async () => {
+    const products = [createProduct('prod-1', 'macbook-pro', 'MacBook Pro')];
+    mockProductRepository.findBySearchTerm.mockResolvedValue(products);
+    mockOfferRepository.findByProductIds.mockResolvedValue([]);
+
+    const query = new SearchProductsQuery('macbook');
+    await service.execute(query);
+
+    expect(mockRecentSearchRepository.save).toHaveBeenCalledTimes(1);
+    const savedSearch = mockRecentSearchRepository.save.mock.calls[0][0];
+    expect(savedSearch).toBeInstanceOf(RecentSearch);
+    expect(savedSearch.searchTerm).toBe('macbook');
+    expect(savedSearch.userId).toBeUndefined();
+  });
+
+  it('should not save search when search term is not provided', async () => {
+    mockProductRepository.findAll.mockResolvedValue([]);
+    mockOfferRepository.findByProductIds.mockResolvedValue([]);
+
+    const query = new SearchProductsQuery();
+    await service.execute(query);
+
+    expect(mockRecentSearchRepository.save).not.toHaveBeenCalled();
+  });
+
+  it('should not save search when no products found', async () => {
+    mockProductRepository.findBySearchTerm.mockResolvedValue([]);
+    mockOfferRepository.findByProductIds.mockResolvedValue([]);
+
+    const query = new SearchProductsQuery('nonexistent');
+    await service.execute(query);
+
+    expect(mockRecentSearchRepository.save).not.toHaveBeenCalled();
   });
 });
