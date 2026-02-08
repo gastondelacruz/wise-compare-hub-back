@@ -1,6 +1,6 @@
 import { IsString, IsOptional, IsArray, IsBoolean } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
+import { Type, Transform } from 'class-transformer';
 
 export class GetProductOffersDto {
   @ApiPropertyOptional({
@@ -13,11 +13,21 @@ export class GetProductOffersDto {
   sort?: string;
 
   @ApiPropertyOptional({
-    description: 'List of vendor IDs to filter',
+    description:
+      'List of vendor IDs to filter. Can be a single vendor or multiple vendors.',
     example: ['amazon', 'bestbuy'],
     type: [String],
   })
   @IsOptional()
+  @Transform(({ value }: { value: string | string[] | undefined }) => {
+    if (Array.isArray(value)) {
+      return value;
+    }
+    if (typeof value === 'string') {
+      return [value];
+    }
+    return value;
+  })
   @IsArray()
   @IsString({ each: true })
   vendors?: string[];
