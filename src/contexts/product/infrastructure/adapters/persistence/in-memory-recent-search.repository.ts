@@ -21,7 +21,20 @@ export class InMemoryRecentSearchRepository implements RecentSearchRepository {
   }
 
   async save(recentSearch: RecentSearch): Promise<void> {
-    this.searches.push(recentSearch);
+    // Buscar si ya existe una búsqueda con el mismo término y userId
+    const existingIndex = this.searches.findIndex(
+      (search) =>
+        search.searchTerm === recentSearch.searchTerm &&
+        search.userId === recentSearch.userId,
+    );
+
+    if (existingIndex !== -1) {
+      // Actualizar el timestamp de la búsqueda existente
+      this.searches[existingIndex] = recentSearch;
+    } else {
+      // Agregar nueva búsqueda
+      this.searches.push(recentSearch);
+    }
     return Promise.resolve();
   }
 

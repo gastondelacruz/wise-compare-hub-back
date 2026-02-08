@@ -1,13 +1,16 @@
 export class RecentSearch {
   public readonly timestamp: Date;
+  public readonly searchTerm: string;
 
   constructor(
-    public readonly searchTerm: string,
+    searchTerm: string,
     public readonly userId?: string,
   ) {
-    if (!searchTerm || searchTerm.trim().length === 0) {
+    const trimmed = searchTerm.trim();
+    if (!trimmed || trimmed.length === 0) {
       throw new Error('Search term cannot be empty');
     }
+    this.searchTerm = trimmed.toLowerCase();
     this.timestamp = new Date();
   }
 

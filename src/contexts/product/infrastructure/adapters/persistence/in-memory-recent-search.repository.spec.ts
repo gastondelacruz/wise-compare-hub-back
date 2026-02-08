@@ -124,5 +124,68 @@ describe('InMemoryRecentSearchRepository', () => {
       expect(searches[1].searchTerm).toBe('mouse');
       expect(searches[2].searchTerm).toBe('laptop');
     });
+
+    it('should not duplicate searches with same term (case insensitive)', async () => {
+      await repository.save(new RecentSearch('Apple'));
+      await repository.save(new RecentSearch('apple'));
+      await repository.save(new RecentSearch('APPLE'));
+
+      const searches = await repository.findGlobal();
+      expect(searches).toHaveLength(1);
+      expect(searches[0].searchTerm).toBe('apple');
+    });
+
+    it('should update timestamp when saving duplicate search term', async () => {
+      const search1 = new RecentSearch('Apple');
+      await repository.save(search1);
+      const firstTimestamp = search1.timestamp;
+
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      const search2 = new RecentSearch('apple');
+      await repository.save(search2);
+      const secondTimestamp = search2.timestamp;
+
+      const searches = await repository.findGlobal();
+      expect(searches).toHaveLength(1);
+      expect(searches[0].searchTerm).toBe('apple');
+      expect(searches[0].timestamp.getTime()).toBeGreaterThan(
+        firstTimestamp.getTime(),
+      );
+      expect(searches[0].timestamp.getTime()).toBe(secondTimestamp.getTime());
+    });
+
+    it('should not duplicate user-specific searches with same term', async () => {
+      const userId = 'user-123';
+      await repository.save(new RecentSearch('Apple', userId));
+      await repository.save(new RecentSearch('apple', userId));
+      await repository.save(new RecentSearch('APPLE', userId));
+
+      const searches = await repository.findByUserId(userId);
+      expect(searches).toHaveLength(1);
+      expect(searches[0].searchTerm).toBe('apple');
+    });
+
+    it('should allow same search term for different users', async () => {
+      await repository.save(new RecentSearch('Apple', 'user-1'));
+      await repository.save(new RecentSearch('apple', 'user-2'));
+
+      const user1Searches = await repository.findByUserId('user-1');
+      const user2Searches = await repository.findByUserId('user-2');
+
+      expect(user1Searches).toHaveLength(1);
+      expect(user2Searches).toHaveLength(1);
+    });
+
+    it('should not mix global and user-specific searches', async () => {
+      await repository.save(new RecentSearch('Apple'));
+      await repository.save(new RecentSearch('apple', 'user-123'));
+
+      const globalSearches = await repository.findGlobal();
+      const userSearches = await repository.findByUserId('user-123');
+
+      expect(globalSearches).toHaveLength(1);
+      expect(userSearches).toHaveLength(1);
+    });
   });
 });

@@ -30,6 +30,21 @@ describe('RecentSearch', () => {
         'Search term cannot be empty',
       );
     });
+
+    it('should normalize search term to lowercase', () => {
+      const recentSearch = new RecentSearch('Apple');
+      expect(recentSearch.searchTerm).toBe('apple');
+    });
+
+    it('should normalize search term with mixed case to lowercase', () => {
+      const recentSearch = new RecentSearch('MacBook Pro');
+      expect(recentSearch.searchTerm).toBe('macbook pro');
+    });
+
+    it('should preserve trimmed whitespace but normalize case', () => {
+      const recentSearch = new RecentSearch('  Apple  ');
+      expect(recentSearch.searchTerm).toBe('apple');
+    });
   });
 
   describe('isUserSearch', () => {
