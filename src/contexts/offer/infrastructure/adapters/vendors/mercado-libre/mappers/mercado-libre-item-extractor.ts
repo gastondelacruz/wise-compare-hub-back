@@ -7,10 +7,10 @@ import {
  * Extracts items from MercadoLibre catalog products.
  * Single Responsibility: Extract items from catalog products structure
  *
- * Note: Catalog products from /products/search don't have prices directly.
- * To get actual offers with prices, we would need to fetch items/announcements
- * for each catalog_product_id. For now, we convert catalog products to items
- * without prices (price = 0) as placeholders.
+ * NOTE: This class is now deprecated in favor of MercadoLibreScraperService.
+ * The scraper provides real-time pricing and availability data directly from
+ * the website, making API-based catalog extraction unnecessary.
+ * Keep this class for backward compatibility only.
  */
 export class MercadoLibreItemExtractor {
   extractItemsFromProducts(

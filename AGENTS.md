@@ -137,6 +137,19 @@ pnpm verify
 
 ## Commit & Pull Request Guidelines
 
+### ⚠️ IMPORTANT: Commits Require Explicit User Request
+
+**🔴 NEVER create commits automatically**. Only commit when the user explicitly requests it with a command like:
+
+- "Create a commit"
+- "Commit these changes"
+- "Make a commit with..."
+- "Commit the work"
+
+Otherwise, simply complete the work and report the status. The user will decide when to commit.
+
+### Commit Style (When Requested)
+
 Follow conventional-commit style: `<type>[scope]: <description>`
 
 **Types**: `feat`, `fix`, `docs`, `chore`, `perf`, `refactor`, `style`, `test`

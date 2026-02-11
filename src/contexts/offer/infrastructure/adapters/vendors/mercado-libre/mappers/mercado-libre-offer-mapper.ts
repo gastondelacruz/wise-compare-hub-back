@@ -35,14 +35,12 @@ export class MercadoLibreOfferMapper {
     item: MercadoLibreItem,
     canonicalProductId: CanonicalProductId,
   ): Offer {
-    // Map shipping cost (0 if free shipping, otherwise estimate or use 0)
-    const shippingCost = item.shipping?.free_shipping ? 0 : 0;
+    // Map shipping cost (0 if free shipping, otherwise use default shipping cost estimate)
+    const shippingCost = item.shipping?.free_shipping ? 0 : 50; // 50 ARS default shipping
 
-    // Map price
-    // Note: Catalog products from /products/search don't have prices directly.
-    // We would need to fetch items/announcements separately to get actual prices.
-    // For now, we use a default price of 1 to create valid offers.
-    // TODO: Implement fetching items/announcements to get real prices
+    // Map price from scraped data
+    // With current scraper, prices should always be valid (filtered by sortByPriceAndGetTop10)
+    // For backward compatibility and robustness, use default price of 1 for invalid prices
     const itemPrice = item.price > 0 ? item.price : 1;
     const price = new Price(itemPrice, shippingCost);
 

@@ -1,168 +1,87 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { HttpService } from '@nestjs/axios';
-import { ConfigService } from '@nestjs/config';
-import { of, throwError } from 'rxjs';
-import { AxiosResponse, AxiosError } from 'axios';
 import { MercadoLibreOfferProvider } from './mercado-libre-offer-provider';
-import { MercadoLibreAuthService } from './mercado-libre-auth.service';
+import { MercadoLibreScraperService } from './mercado-libre-scraper.service';
 import { CanonicalProductId } from '@contexts/product/domain/models/canonical-product-id.vo';
-import { MercadoLibreProduct } from './types/mercado-libre-api.types';
+import { MercadoLibreItem } from './types/mercado-libre-api.types';
 
 describe('MercadoLibreOfferProvider', () => {
   let provider: MercadoLibreOfferProvider;
-  let httpService: jest.Mocked<HttpService>;
-  let authService: jest.Mocked<MercadoLibreAuthService>;
-  let configService: jest.Mocked<ConfigService>;
+  let scraperService: jest.Mocked<MercadoLibreScraperService>;
 
-  const createMockMlProductsResponse = (products: MercadoLibreProduct[]) =>
-    ({
-      data: {
-        keywords: 'test',
-        results: products,
-        paging: {
-          total: products.length,
-          offset: 0,
-          limit: 50,
-          last: products.length > 0 ? products[products.length - 1].id : '',
+  const createMockMercadoLibreItem = (
+    overrides?: Partial<MercadoLibreItem>,
+  ): MercadoLibreItem => ({
+    id: overrides?.id || 'MLA123456',
+    title: overrides?.title || 'Test Product',
+    price: overrides?.price ?? 10000,
+    currency_id: 'ARS',
+    picture_url: overrides?.picture_url || 'https://example.com/image.jpg',
+    condition: 'new',
+    shipping: {
+      free_shipping: overrides?.shipping?.free_shipping ?? false,
+    },
+    seller: {
+      id: 0,
+      reputation: {
+        transactions: {
+          ratings: {
+            average:
+              overrides?.seller?.reputation?.transactions?.ratings?.average ??
+              4.5,
+          },
         },
-        query_type: 'KEYWORDS',
       },
-      status: 200,
-      statusText: 'OK',
-      headers: {},
-      config: {} as unknown,
-    }) as AxiosResponse;
-
-  const createMockMlProduct = (overrides?: {
-    id?: string;
-    catalog_product_id?: string;
-    name?: string;
-    pictures?: Array<{
-      id: string;
-      url: string;
-      max_width: string;
-      max_height: string;
-    }>;
-  }): MercadoLibreProduct => ({
-    id: overrides?.id || 'MLA49689844',
-    catalog_product_id:
-      overrides?.catalog_product_id || overrides?.id || 'MLA49689844',
-    domain_id: 'MLA-CELLPHONES',
-    name: overrides?.name || 'Test Product',
-    parent_id: 'MLA123',
-    settings: {
-      content: 'fixed',
-      listing_strategy: 'open',
-      exclusive: false,
     },
-    children_ids: [],
-    attributes: [],
-    status: 'active',
-    short_description: {
-      type: 'plaintext',
-      content: 'Test description',
-    },
-    pictures: overrides?.pictures || [
-      {
-        id: 'pic1',
-        url: 'https://example.com/image.jpg',
-        max_width: '500',
-        max_height: '500',
-      },
-    ],
-    authority_types: ['COMMUNITY'],
-    date_created: '2025-01-01T00:00:00Z',
-    last_updated: '2025-01-01T00:00:00Z',
-    quality_type: 'COMPLETE',
-    product_standard: true,
-    search_type: 'KEYWORD',
   });
 
   beforeEach(async () => {
-    const mockHttpService = {
-      get: jest.fn(),
-    };
-
-    const mockAuthService = {
-      getAccessToken: jest.fn().mockResolvedValue('APP_USR-test-token-12345'),
-    };
-
-    const mockConfigService = {
-      get: jest.fn().mockImplementation((key: string) => {
-        if (key === 'MERCADOLIBRE_PRODUCTS_SEARCH_URL')
-          return 'https://api.mercadolibre.com/products/search';
-        return undefined;
-      }),
+    const mockScraperService = {
+      scrapeTopOffers: jest.fn(),
+      closeBrowser: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         MercadoLibreOfferProvider,
         {
-          provide: HttpService,
-          useValue: mockHttpService,
-        },
-        {
-          provide: MercadoLibreAuthService,
-          useValue: mockAuthService,
-        },
-        {
-          provide: ConfigService,
-          useValue: mockConfigService,
+          provide: MercadoLibreScraperService,
+          useValue: mockScraperService,
         },
       ],
     }).compile();
 
     provider = module.get<MercadoLibreOfferProvider>(MercadoLibreOfferProvider);
-    httpService = module.get(HttpService);
-    authService = module.get(MercadoLibreAuthService);
-    configService = module.get(ConfigService);
+    scraperService = module.get(MercadoLibreScraperService);
   });
 
-  it('should fetch offers from Mercado Libre API', async () => {
+  it('should be defined', () => {
+    expect(provider).toBeDefined();
+  });
+
+  it('should fetch offers from Mercado Libre scraper', async () => {
     // Arrange
-    const canonicalProductId = new CanonicalProductId('test-product-id');
-    const mockProducts = [
-      createMockMlProduct({
-        id: 'MLA111',
-        name: 'Product 1',
-      }),
-      createMockMlProduct({
-        id: 'MLA222',
-        name: 'Product 2',
-      }),
+    const canonicalProductId = new CanonicalProductId('test-product');
+    const mockItems = [
+      createMockMercadoLibreItem({ id: 'MLA111', price: 5000 }),
+      createMockMercadoLibreItem({ id: 'MLA222', price: 7000 }),
+      createMockMercadoLibreItem({ id: 'MLA333', price: 6000 }),
     ];
 
-    httpService.get.mockReturnValue(
-      of(createMockMlProductsResponse(mockProducts)),
-    );
+    scraperService.scrapeTopOffers.mockResolvedValue(mockItems);
 
     // Act
     const result = await provider.fetchOffers(canonicalProductId);
 
     // Assert
-    expect(authService.getAccessToken).toHaveBeenCalled();
-    expect(httpService.get).toHaveBeenCalledWith(
-      'https://api.mercadolibre.com/products/search',
-      expect.objectContaining({
-        params: expect.objectContaining({
-          status: 'active',
-          site_id: 'MLA',
-          q: 'test-product-id',
-        }),
-        headers: expect.objectContaining({
-          Authorization: 'Bearer APP_USR-test-token-12345',
-        }),
-      }),
-    );
-    // Note: Catalog products don't have prices, so offers will have default price of 1
-    expect(result.length).toBeGreaterThanOrEqual(0);
+    expect(scraperService.scrapeTopOffers).toHaveBeenCalledWith('test-product');
+    expect(result.length).toBe(3);
+    expect(result[0].price.basePrice).toBe(5000);
   });
 
-  it('should return empty array when API returns no results', async () => {
+  it('should return empty array when scraper returns no results', async () => {
     // Arrange
     const canonicalProductId = new CanonicalProductId('non-existent-product');
-    httpService.get.mockReturnValue(of(createMockMlProductsResponse([])));
+    scraperService.scrapeTopOffers.mockResolvedValue([]);
 
     // Act
     const result = await provider.fetchOffers(canonicalProductId);
@@ -172,128 +91,167 @@ describe('MercadoLibreOfferProvider', () => {
     expect(Array.isArray(result)).toBe(true);
   });
 
-  it('should return empty array when token cannot be obtained', async () => {
-    // Arrange
-    const canonicalProductId = new CanonicalProductId('test');
-    authService.getAccessToken.mockResolvedValue(null);
-
-    // Act
-    const result = await provider.fetchOffers(canonicalProductId);
-
-    // Assert
-    expect(result).toEqual([]);
-    expect(httpService.get).not.toHaveBeenCalled();
-  });
-
-  it('should fail gracefully and return empty array on API error', async () => {
-    // Arrange
-    const canonicalProductId = new CanonicalProductId('test');
-    const axiosError = {
-      response: {
-        status: 500,
-        data: { message: 'Internal Server Error' },
-      },
-      isAxiosError: true,
-    } as AxiosError;
-
-    httpService.get.mockReturnValue(throwError(() => axiosError));
-
-    // Act
-    const result = await provider.fetchOffers(canonicalProductId);
-
-    // Assert
-    expect(result).toEqual([]);
-  });
-
-  it('should fail gracefully and return empty array on network error', async () => {
-    // Arrange
-    const canonicalProductId = new CanonicalProductId('test');
-    const networkError = new Error('Network error');
-    httpService.get.mockReturnValue(throwError(() => networkError));
-
-    // Act
-    const result = await provider.fetchOffers(canonicalProductId);
-
-    // Assert
-    expect(result).toEqual([]);
-  });
-
-  it('should fail gracefully on timeout', async () => {
-    // Arrange
-    const canonicalProductId = new CanonicalProductId('test');
-    const timeoutError = {
-      code: 'ECONNABORTED',
-      message: 'timeout',
-      isAxiosError: true,
-    } as AxiosError;
-
-    httpService.get.mockReturnValue(throwError(() => timeoutError));
-
-    // Act
-    const result = await provider.fetchOffers(canonicalProductId);
-
-    // Assert
-    expect(result).toEqual([]);
-  });
-
-  it('should use Mercado Libre products search endpoint from environment', async () => {
+  it('should fail gracefully and return empty array on scraper error', async () => {
     // Arrange
     const canonicalProductId = new CanonicalProductId('test-product');
-    httpService.get.mockReturnValue(of(createMockMlProductsResponse([])));
-
-    // Act
-    await provider.fetchOffers(canonicalProductId);
-
-    // Assert
-    expect(httpService.get).toHaveBeenCalledWith(
-      'https://api.mercadolibre.com/products/search',
-      expect.any(Object),
+    scraperService.scrapeTopOffers.mockRejectedValue(
+      new Error('Scraper error'),
     );
-  });
-
-  it('should return empty array if products search URL is missing', async () => {
-    // Arrange
-    const canonicalProductId = new CanonicalProductId('test-product');
-    // Reset configService mock to return undefined for URL
-    configService.get.mockImplementation((key: string) => {
-      if (key === 'MERCADOLIBRE_PRODUCTS_SEARCH_URL') return undefined;
-      return undefined;
-    });
 
     // Act
     const result = await provider.fetchOffers(canonicalProductId);
 
-    // Assert - Error is caught and returns empty array gracefully
+    // Assert
     expect(result).toEqual([]);
   });
 
-  it('should handle catalog products structure correctly', async () => {
+  it('should map scraped items to offers correctly', async () => {
     // Arrange
-    const canonicalProductId = new CanonicalProductId('s25-ultra');
-    const mockProduct = createMockMlProduct({
-      id: 'MLA49689844',
-      catalog_product_id: 'MLA49689844',
-      name: 'Samsung S25 Ultra Rugged Galaxy S25 Ultra Negro',
-      pictures: [
-        {
-          id: '956244-MLA95677477841_102025',
-          url: 'https://http2.mlstatic.com/D_NQ_NP_956244-MLA95677477841_102025-F.jpg',
-          max_width: '1048',
-          max_height: '1200',
+    const canonicalProductId = new CanonicalProductId('laptop');
+    const mockItems = [
+      createMockMercadoLibreItem({
+        id: 'MLA001',
+        title: 'Laptop HP',
+        price: 45000,
+        shipping: { free_shipping: true },
+        seller: {
+          id: 123,
+          reputation: {
+            transactions: { ratings: { average: 4.8 } },
+          },
         },
-      ],
-    });
+      }),
+    ];
 
-    httpService.get.mockReturnValue(
-      of(createMockMlProductsResponse([mockProduct])),
-    );
+    scraperService.scrapeTopOffers.mockResolvedValue(mockItems);
 
     // Act
     const result = await provider.fetchOffers(canonicalProductId);
 
     // Assert
-    // Note: Since catalog products don't have prices, offers will be created with default price
-    // In a real implementation, we would need to fetch items/announcements to get actual prices
-    expect(result.length).toBeGreaterThanOrEqual(0);
+    expect(result.length).toBe(1);
+    expect(result[0].vendor.name).toBe('MercadoLibre');
+    expect(result[0].price.basePrice).toBe(45000);
+    expect(result[0].price.shipping).toBe(0); // Free shipping
+    expect(result[0].rating?.value).toBe(4.8);
+  });
+
+  it('should handle items with paid shipping', async () => {
+    // Arrange
+    const canonicalProductId = new CanonicalProductId('product');
+    const mockItems = [
+      createMockMercadoLibreItem({
+        price: 10000,
+        shipping: { free_shipping: false },
+      }),
+    ];
+
+    scraperService.scrapeTopOffers.mockResolvedValue(mockItems);
+
+    // Act
+    const result = await provider.fetchOffers(canonicalProductId);
+
+    // Assert
+    expect(result[0].price.shipping).toBe(50); // Default shipping cost
+  });
+
+  it('should handle items with zero price by using default price', async () => {
+    // Arrange
+    const canonicalProductId = new CanonicalProductId('product');
+    // Note: Scraper should never return items with price 0 due to its filtering logic
+    // But for robustness, mapper uses default price of 1 for invalid prices
+    const mockItems = [
+      createMockMercadoLibreItem({ id: 'MLA001', price: 5000 }),
+      createMockMercadoLibreItem({ id: 'MLA002', price: 0 }), // Invalid - uses default price
+      createMockMercadoLibreItem({ id: 'MLA003', price: 7000 }),
+    ];
+
+    scraperService.scrapeTopOffers.mockResolvedValue(mockItems);
+
+    // Act
+    const result = await provider.fetchOffers(canonicalProductId);
+
+    // Assert - All items should be included (invalid prices use default price of 1)
+    expect(result.length).toBe(3);
+    expect(result.some((o) => o.id.value === 'MLA001')).toBe(true);
+    expect(result.some((o) => o.id.value === 'MLA002')).toBe(true);
+    expect(result.some((o) => o.id.value === 'MLA003')).toBe(true);
+    expect(result.find((o) => o.id.value === 'MLA002')?.price.basePrice).toBe(
+      1,
+    ); // Default price
+  });
+
+  it('should handle items with no seller rating', async () => {
+    // Arrange
+    const canonicalProductId = new CanonicalProductId('product');
+    // Create item without rating by using minimal seller object
+    const mockItems: MercadoLibreItem[] = [
+      {
+        id: 'MLA001',
+        title: 'Test Product',
+        price: 5000,
+        currency_id: 'ARS',
+        condition: 'new',
+        seller: { id: 123 }, // Seller without reputation/rating
+      },
+    ];
+
+    scraperService.scrapeTopOffers.mockResolvedValue(mockItems);
+
+    // Act
+    const result = await provider.fetchOffers(canonicalProductId);
+
+    // Assert
+    expect(result.length).toBe(1);
+    // When seller has no reputation data, rating should be undefined
+    expect(result[0].rating).toBeUndefined();
+  });
+
+  it('should handle network/scraping errors gracefully', async () => {
+    // Arrange
+    const canonicalProductId = new CanonicalProductId('test');
+    const networkError = new Error('Network timeout');
+    scraperService.scrapeTopOffers.mockRejectedValue(networkError);
+
+    // Act
+    const result = await provider.fetchOffers(canonicalProductId);
+
+    // Assert
+    expect(result).toEqual([]);
+  });
+
+  it('should close browser on application shutdown', async () => {
+    // Act
+    await provider.onApplicationShutdown();
+
+    // Assert
+    expect(scraperService.closeBrowser).toHaveBeenCalled();
+  });
+
+  it('should return offers for multiple search queries independently', async () => {
+    // Arrange
+    const product1 = new CanonicalProductId('laptop');
+    const product2 = new CanonicalProductId('mouse');
+
+    const mockItems1 = [
+      createMockMercadoLibreItem({ id: 'MLA001', price: 50000 }),
+    ];
+    const mockItems2 = [
+      createMockMercadoLibreItem({ id: 'MLA002', price: 500 }),
+    ];
+
+    scraperService.scrapeTopOffers
+      .mockResolvedValueOnce(mockItems1)
+      .mockResolvedValueOnce(mockItems2);
+
+    // Act
+    const result1 = await provider.fetchOffers(product1);
+    const result2 = await provider.fetchOffers(product2);
+
+    // Assert
+    expect(scraperService.scrapeTopOffers).toHaveBeenCalledWith('laptop');
+    expect(scraperService.scrapeTopOffers).toHaveBeenCalledWith('mouse');
+    expect(result1[0].price.basePrice).toBe(50000);
+    expect(result2[0].price.basePrice).toBe(500);
   });
 });
