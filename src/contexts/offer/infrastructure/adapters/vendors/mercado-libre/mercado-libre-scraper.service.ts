@@ -177,10 +177,12 @@ export class MercadoLibreScraperService {
       const idMatch = href.match(/\/p\/(MLA\d+)/);
       const id = idMatch ? idMatch[1] : 'unknown';
 
-      // Extract price - use span[class*="price"]
+      // Extract price - use span.andes-money-amount__fraction
       let priceText = '';
       try {
-        const priceElement = element.locator('span[class*="price"]');
+        const priceElement = element.locator(
+          'span.andes-money-amount__fraction',
+        );
         priceText = (await priceElement.textContent()) || '';
       } catch {
         // Price is optional - some products might not have price on list view

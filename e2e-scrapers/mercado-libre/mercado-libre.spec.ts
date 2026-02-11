@@ -58,8 +58,10 @@ test.describe('Mercado Libre Scraper', () => {
           const titleElement = card.querySelector('h3 > a');
           const title = titleElement?.textContent?.trim() || '';
 
-          // Extract price - use span[class*="price"] instead
-          const priceElement = card.querySelector('span[class*="price"]');
+          // Extract price from span.andes-money-amount__fraction
+          const priceElement = card.querySelector(
+            'span.andes-money-amount__fraction',
+          );
           const price = priceElement?.textContent?.trim() || '';
 
           // Extract image URL from img.poly-component__picture
@@ -141,7 +143,9 @@ test.describe('Mercado Libre Scraper', () => {
           const titleElement = card.querySelector('h3 > a');
           const title = titleElement?.textContent?.trim() || '';
 
-          const priceElement = card.querySelector('span[class*="price"]');
+          const priceElement = card.querySelector(
+            'span.andes-money-amount__fraction',
+          );
           const priceText = priceElement?.textContent?.trim() || '0';
 
           // Parse price - remove currency symbols and spaces, keep only numbers
@@ -231,7 +235,7 @@ test.describe('Mercado Libre Scraper', () => {
     // Wait for results to load
     await page.waitForTimeout(2000);
 
-    // Discover actual nested selectors
+    // Discover actual nested selectors including price variants
     const discovery = await page.evaluate(() => {
       const productCards = document.querySelectorAll(
         'div.andes-card.poly-card.poly-card--grid-card',
@@ -240,13 +244,12 @@ test.describe('Mercado Libre Scraper', () => {
       const analysis = {
         totalCards: productCards.length,
         nestedSelectors: {
-          'h3.poly-component__title-wrapper > a.poly-component__title': 0,
           'h3 > a': 0,
           'a[href*="/p/"]': 0,
-          'span.poly-price__current-price-text': 0,
+          'span.andes-money-amount__fraction': 0,
           'span[class*="price"]': 0,
+          'span.poly-price__current-price-text': 0,
           'img.poly-component__picture': 0,
-          'img[data-testid="picture"]': 0,
           img: 0,
         },
         firstCardHTML: '',
@@ -258,39 +261,41 @@ test.describe('Mercado Libre Scraper', () => {
         const card = productCards[0];
 
         // Test each selector
-        analysis.nestedSelectors[
-          'h3.poly-component__title-wrapper > a.poly-component__title'
-        ] = card.querySelectorAll(
-          'h3.poly-component__title-wrapper > a.poly-component__title',
-        ).length;
         analysis.nestedSelectors['h3 > a'] =
           card.querySelectorAll('h3 > a').length;
         analysis.nestedSelectors['a[href*="/p/"]'] =
           card.querySelectorAll('a[href*="/p/"]').length;
-        analysis.nestedSelectors['span.poly-price__current-price-text'] =
-          card.querySelectorAll('span.poly-price__current-price-text').length;
+        analysis.nestedSelectors['span.andes-money-amount__fraction'] =
+          card.querySelectorAll('span.andes-money-amount__fraction').length;
         analysis.nestedSelectors['span[class*="price"]'] =
           card.querySelectorAll('span[class*="price"]').length;
+        analysis.nestedSelectors['span.poly-price__current-price-text'] =
+          card.querySelectorAll('span.poly-price__current-price-text').length;
         analysis.nestedSelectors['img.poly-component__picture'] =
           card.querySelectorAll('img.poly-component__picture').length;
-        analysis.nestedSelectors['img[data-testid="picture"]'] =
-          card.querySelectorAll('img[data-testid="picture"]').length;
         analysis.nestedSelectors['img'] = card.querySelectorAll('img').length;
 
         // Get actual HTML of first card
-        analysis.firstCardHTML = card.innerHTML.substring(0, 1000);
+        analysis.firstCardHTML = card.innerHTML.substring(0, 1500);
 
         // Get elements info
-        const titleEl =
-          card.querySelector('h3 > a') || card.querySelector('a[href*="/p/"]');
-        const priceEl = card.querySelector('span[class*="price"]');
+        const titleEl = card.querySelector('h3 > a');
+        const fractionPriceEl = card.querySelector(
+          'span.andes-money-amount__fraction',
+        );
+        const allPriceSpans = card.querySelectorAll('span[class*="price"]');
         const imgEl = card.querySelector('img');
 
         analysis.firstCardElements = {
           hasTitle: !!titleEl,
           titleText: titleEl?.textContent?.substring(0, 50) || '',
-          hasPrice: !!priceEl,
-          priceText: priceEl?.textContent?.substring(0, 30) || '',
+          hasFractionPrice: !!fractionPriceEl,
+          fractionPriceText:
+            fractionPriceEl?.textContent?.substring(0, 30) || '',
+          priceSpanCount: allPriceSpans.length,
+          priceSpans: Array.from(allPriceSpans).map((span) =>
+            span.textContent?.trim().substring(0, 50),
+          ),
           hasImage: !!imgEl,
           imageSrc: imgEl?.getAttribute('src')?.substring(0, 80) || '',
         };
@@ -308,12 +313,16 @@ test.describe('Mercado Libre Scraper', () => {
 
     console.log('\nFirst card elements:');
     Object.entries(discovery.firstCardElements).forEach(([key, value]) => {
-      console.log(`   ${key}: ${value}`);
+      if (key === 'priceSpans') {
+        console.log(`   ${key}:`, value);
+      } else {
+        console.log(`   ${key}: ${value}`);
+      }
     });
 
     console.log(
-      '\nFirst card HTML sample:',
-      discovery.firstCardHTML.substring(0, 200),
+      '\nFirst card HTML sample:\n',
+      discovery.firstCardHTML.substring(0, 300),
     );
 
     // Take screenshot for manual inspection
