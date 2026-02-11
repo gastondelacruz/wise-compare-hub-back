@@ -18,6 +18,8 @@ lerna-debug.log*
 # Tests
 /coverage
 /.nyc_output
+/test-results/
+/playwright-report/
 
 # IDEs and editors
 /.idea
@@ -45,6 +47,10 @@ lerna-debug.log*
 # temp directory
 .temp
 .tmp
+
+# Playwright E2E tests
+*.png
+*.webm
 
 # Runtime data
 pids
