@@ -54,6 +54,7 @@ Specialized patterns for NestJS Hexagonal Architecture with TDD:
 | `jest`             | Unit and integration testing framework      |
 | `axios`            | HTTP client for API calls and requests      |
 | `supertest`        | E2E testing library for HTTP endpoints      |
+| `playwright`       | Browser automation and E2E testing          |
 
 ## Directory Structure
 
@@ -77,7 +78,7 @@ For Wise Compare Hub, the Auto-invoke table is maintained in the main `AGENTS.md
 
 ## About These Skills
 
-This project uses six carefully curated skills:
+This project uses seven carefully curated skills:
 
 **Core Development Skills:**
 
@@ -85,7 +86,12 @@ This project uses six carefully curated skills:
 2. **`nestjs-10`** - NestJS framework patterns, dependency injection, modules, and decorators
 3. **`nestjs-hexagonal`** - Complete patterns for NestJS with Hexagonal Architecture and TDD
 
-**Testing & HTTP Skills:** 4. **`jest`** - Unit and integration testing framework with mocking patterns 5. **`axios`** - HTTP client for API calls and external service integration 6. **`supertest`** - E2E testing library for HTTP endpoints and API contracts
+**Testing & HTTP Skills:**
+
+4. **`jest`** - Unit and integration testing framework with mocking patterns
+5. **`axios`** - HTTP client for API calls and external service integration
+6. **`supertest`** - E2E testing library for HTTP endpoints and API contracts
+7. **`playwright`** - Browser automation and E2E testing library for full user workflows
 
 All skills include **CRITICAL sections** that require consulting the **Context7 MCP** before implementation. These skills are tailored specifically for the Wise Compare Hub project architecture and are referenced in the main `AGENTS.md` file.
 

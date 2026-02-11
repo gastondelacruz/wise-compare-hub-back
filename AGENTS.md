@@ -18,6 +18,7 @@ Use these skills for detailed patterns on-demand:
 | `jest`             | Unit and integration testing framework      | [SKILL.md](skills/jest/SKILL.md)             |
 | `axios`            | HTTP client for API calls and requests      | [SKILL.md](skills/axios/SKILL.md)            |
 | `supertest`        | E2E testing library for HTTP endpoints      | [SKILL.md](skills/supertest/SKILL.md)        |
+| `playwright`       | Browser automation and E2E testing          | [SKILL.md](skills/playwright/SKILL.md)       |
 
 ### Auto-invoke Skills
 
@@ -31,6 +32,7 @@ When performing these actions, ALWAYS invoke the corresponding skill FIRST:
 | Writing tests (domain/application/infrastructure)             | `jest`             |
 | Writing unit tests for domain/application logic               | `jest`             |
 | Writing E2E tests for endpoints                               | `supertest`        |
+| Writing E2E browser automation tests                          | `playwright`       |
 | Making HTTP requests in application code                      | `axios`            |
 | Implementing domain layer (entities, value objects)           | `nestjs-hexagonal` |
 | Implementing application layer (use cases, ports)             | `nestjs-hexagonal` |
@@ -85,6 +87,7 @@ pnpm verify
 - **TypeORM**: ORM for database operations
 - **Jest**: Unit and integration testing framework
 - **Supertest**: E2E testing for HTTP endpoints
+- **Playwright**: Browser automation and E2E testing
 - **Axios**: HTTP client for API requests
 - **PostgreSQL**: Primary data store
 - **Hexagonal Architecture**: Domain, Application, Infrastructure layers
@@ -198,11 +201,12 @@ For detailed guidance on specific patterns:
 2. **NestJS Framework (Controllers, Services, Modules)** → Read `skills/nestjs-10/SKILL.md`
 3. **Unit & Integration Tests** → Read `skills/jest/SKILL.md`
 4. **E2E Testing with HTTP Endpoints** → Read `skills/supertest/SKILL.md`
-5. **Making HTTP Requests** → Read `skills/axios/SKILL.md`
-6. **Hexagonal Architecture & TDD** → Read `skills/nestjs-hexagonal/SKILL.md`
-7. **Domain/Application/Infrastructure Implementation** → Read `skills/nestjs-hexagonal/SKILL.md`
-8. **Exception Filters & Guards** → See `skills/nestjs-hexagonal/SKILL.md` and `skills/nestjs-10/SKILL.md`
-9. **Architecture Decisions** → Consult the Quick Decision Tree in `skills/nestjs-hexagonal/SKILL.md`
+5. **Browser Automation & E2E Testing** → Read `skills/playwright/SKILL.md`
+6. **Making HTTP Requests** → Read `skills/axios/SKILL.md`
+7. **Hexagonal Architecture & TDD** → Read `skills/nestjs-hexagonal/SKILL.md`
+8. **Domain/Application/Infrastructure Implementation** → Read `skills/nestjs-hexagonal/SKILL.md`
+9. **Exception Filters & Guards** → See `skills/nestjs-hexagonal/SKILL.md` and `skills/nestjs-10/SKILL.md`
+10. **Architecture Decisions** → Consult the Quick Decision Tree in `skills/nestjs-hexagonal/SKILL.md`
 
 ---
 
