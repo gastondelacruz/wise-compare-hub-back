@@ -49,8 +49,12 @@ lerna-debug.log*
 .tmp
 
 # Playwright E2E tests
-*.png
-*.webm
+/e2e-scrapers/**/*.png
+/e2e-scrapers/**/*.webm
+*-screenshot.png
+discovery-screenshot.png
+search-results.png
+top-10-products.png
 
 # Runtime data
 pids
