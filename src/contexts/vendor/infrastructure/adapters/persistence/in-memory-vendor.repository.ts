@@ -12,54 +12,17 @@ export class InMemoryVendorRepository implements VendorRepository {
   }
 
   private initializeMockVendors(): void {
-    const mockVendors = [
-      {
-        id: 'amazon',
-        name: 'Amazon',
-        isOfficial: true,
-        logoUrl: 'https://cdn.wisecompare.com/vendors/amazon.svg',
-        enabled: true,
-      },
-      {
-        id: 'bestbuy',
-        name: 'Best Buy',
-        isOfficial: true,
-        logoUrl: 'https://cdn.wisecompare.com/vendors/bestbuy.svg',
-        enabled: true,
-      },
-      {
-        id: 'walmart',
-        name: 'Walmart',
-        isOfficial: true,
-        logoUrl: 'https://cdn.wisecompare.com/vendors/walmart.svg',
-        enabled: true,
-      },
-      {
-        id: 'target',
-        name: 'Target',
-        isOfficial: false,
-        logoUrl: 'https://cdn.wisecompare.com/vendors/target.svg',
-        enabled: true,
-      },
-      {
-        id: 'newegg',
-        name: 'Newegg',
-        isOfficial: false,
-        logoUrl: 'https://cdn.wisecompare.com/vendors/newegg.svg',
-        enabled: true,
-      },
-    ];
+    // Only initialize real vendors with actual implementations
+    // Other vendors will be added when their scrapers are implemented
+    const mercadoLibre = new Vendor(
+      new VendorId('mercadolibre'),
+      'MercadoLibre',
+      true, // isOfficial
+      'https://cdn.wisecompare.com/vendors/mercadolibre.svg',
+      true, // enabled
+    );
 
-    mockVendors.forEach((mock) => {
-      const vendor = new Vendor(
-        new VendorId(mock.id),
-        mock.name,
-        mock.isOfficial,
-        mock.logoUrl,
-        mock.enabled,
-      );
-      this.vendors.push(vendor);
-    });
+    this.vendors.push(mercadoLibre);
   }
 
   findAll(): Promise<Vendor[]> {

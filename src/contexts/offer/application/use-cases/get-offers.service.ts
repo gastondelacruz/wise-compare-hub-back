@@ -32,9 +32,10 @@ export class GetOffersService implements GetOffersUseCase {
       userId,
     );
 
-    // If no offers found, request offers fetch
+    // If no offers found, trigger scraper in background (fire-and-forget)
     if (result.offers.length === 0) {
-      await this.requestOffersFetchUseCase.execute(canonicalProductId);
+      // Don't await - let scraper run in background
+      void this.requestOffersFetchUseCase.execute(canonicalProductId);
     }
 
     return result;

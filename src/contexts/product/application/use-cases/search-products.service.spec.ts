@@ -4,6 +4,7 @@ import { SearchProductsQuery } from '../dto/search-products-query';
 import { ProductRepository } from '../ports/output/product.repository';
 import { OfferRepository } from '@contexts/offer/application/ports/output/offer.repository';
 import { RecentSearchRepository } from '../ports/output/recent-search.repository';
+import { RequestOffersFetchUseCase } from '@contexts/offer/application/ports/input/request-offers-fetch-use-case';
 import { Product } from '@contexts/product/domain/models/product.entity';
 import { ProductId } from '@contexts/product/domain/models/product-id.vo';
 import { CanonicalProductId } from '@contexts/product/domain/models/canonical-product-id.vo';
@@ -21,6 +22,7 @@ describe('SearchProductsService', () => {
   let mockProductRepository: jest.Mocked<ProductRepository>;
   let mockOfferRepository: jest.Mocked<OfferRepository>;
   let mockRecentSearchRepository: jest.Mocked<RecentSearchRepository>;
+  let mockRequestOffersFetchUseCase: jest.Mocked<RequestOffersFetchUseCase>;
 
   const createProduct = (
     id: string,
@@ -72,14 +74,20 @@ describe('SearchProductsService', () => {
       findById: jest.fn(),
       findByCanonicalProductId: jest.fn(),
       findBySearchTerm: jest.fn(),
+      save: jest.fn(),
     };
     mockOfferRepository = {
       findByProductIds: jest.fn(),
+      save: jest.fn(),
+      deleteByProductIdAndVendorId: jest.fn(),
     };
     mockRecentSearchRepository = {
       findByUserId: jest.fn(),
       findGlobal: jest.fn(),
       save: jest.fn(),
+    };
+    mockRequestOffersFetchUseCase = {
+      execute: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -97,22 +105,68 @@ describe('SearchProductsService', () => {
           provide: 'RecentSearchRepository',
           useValue: mockRecentSearchRepository,
         },
+        {
+          provide: 'RequestOffersFetchUseCase',
+          useValue: mockRequestOffersFetchUseCase,
+        },
       ],
     }).compile();
 
     service = module.get<SearchProductsService>(SearchProductsService);
   });
 
-  it('should return empty results when no products match search term', async () => {
+  it('should trigger async scraper and return empty when no products found', async () => {
     mockProductRepository.findBySearchTerm.mockResolvedValue([]);
-    mockOfferRepository.findByProductIds.mockResolvedValue([]);
+    mockRequestOffersFetchUseCase.execute.mockResolvedValue();
 
-    const query = new SearchProductsQuery('nonexistent');
+    const query = new SearchProductsQuery('notebook lenovo');
     const result = await service.execute(query);
 
+    // Should trigger async scraper
+    expect(mockRequestOffersFetchUseCase.execute).toHaveBeenCalledWith(
+      'notebook lenovo',
+    );
+    expect(mockRequestOffersFetchUseCase.execute).toHaveBeenCalledTimes(1);
+
+    // Should only call repository once (no retry since scraper is async)
+    expect(mockProductRepository.findBySearchTerm).toHaveBeenCalledTimes(1);
+
+    // Should return empty immediately (scraper works in background)
     expect(result.total).toBe(0);
     expect(result.products).toHaveLength(0);
-    expect(result.query).toBe('nonexistent');
+    expect(result.query).toBe('notebook lenovo');
+  });
+
+  it('should return products when found in repository (scraper already populated)', async () => {
+    const products = [createProduct('prod-1', 'notebook', 'Notebook Lenovo')];
+    const offers = [
+      createOffer(
+        'offer-1',
+        'prod-1',
+        'mercadolibre',
+        'MercadoLibre',
+        450000,
+        0,
+        3,
+        4.5,
+      ),
+    ];
+
+    mockProductRepository.findBySearchTerm.mockResolvedValue(products);
+    mockOfferRepository.findByProductIds.mockResolvedValue(offers);
+
+    const query = new SearchProductsQuery('notebook lenovo');
+    const result = await service.execute(query);
+
+    // Should NOT trigger scraper since products were found
+    expect(mockRequestOffersFetchUseCase.execute).not.toHaveBeenCalled();
+
+    // Should return products immediately
+    expect(result.total).toBe(1);
+    expect(result.products).toHaveLength(1);
+    expect(result.products[0].canonicalProductId).toBe('notebook');
+    expect(result.products[0].offersSummary.offersCount).toBe(1);
+    expect(result.products[0].offersSummary.bestPrice).toBe(450000);
   });
 
   it('should return products grouped by canonicalProductId', async () => {

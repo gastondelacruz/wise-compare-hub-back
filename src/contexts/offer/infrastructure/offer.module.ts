@@ -4,7 +4,7 @@ import { ConfigModule } from '@nestjs/config';
 import { InMemoryOfferRepository } from './adapters/persistence/in-memory-offer.repository';
 import { InMemoryProductRepository } from '@contexts/product/infrastructure/adapters/persistence/in-memory-product.repository';
 import { MercadoLibreOfferProvider } from './adapters/vendors/mercado-libre/mercado-libre-offer-provider';
-import { MercadoLibreAuthService } from './adapters/vendors/mercado-libre/mercado-libre-auth.service';
+import { MercadoLibreScraperService } from './adapters/vendors/mercado-libre/mercado-libre-scraper.service';
 import { IngestOffersService } from '@contexts/offer/application/use-cases/ingest-offers.service';
 import { OffersQueryService } from '@contexts/offer/application/use-cases/offers-query.service';
 import { RequestOffersFetchService } from '@contexts/offer/application/use-cases/request-offers-fetch.service';
@@ -28,7 +28,7 @@ import { JwtAuthGuard } from '@common/guards/jwt-auth.guard';
       provide: 'ProductRepository',
       useClass: InMemoryProductRepository,
     },
-    MercadoLibreAuthService,
+    MercadoLibreScraperService,
     MercadoLibreOfferProvider,
     {
       provide: 'VendorOfferProviders',

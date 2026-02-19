@@ -1,4 +1,4 @@
-import { Injectable, Inject } from '@nestjs/common';
+import { Injectable, Inject, Logger } from '@nestjs/common';
 import { SearchProductsUseCase } from '../ports/input/search-products-use-case';
 import { SearchProductsQuery } from '../dto/search-products-query';
 import {
@@ -11,6 +11,7 @@ import {
 import { ProductRepository } from '../ports/output/product.repository';
 import { OfferRepository } from '@contexts/offer/application/ports/output/offer.repository';
 import { RecentSearchRepository } from '../ports/output/recent-search.repository';
+import { RequestOffersFetchUseCase } from '@contexts/offer/application/ports/input/request-offers-fetch-use-case';
 import { Product } from '@contexts/product/domain/models/product.entity';
 import { Offer } from '@contexts/offer/domain/models/offer.entity';
 import { RecentSearch } from '@contexts/product/domain/models/recent-search.entity';
@@ -18,6 +19,8 @@ import { PRODUCT_RULES } from '@contexts/product/domain/constants/product-rules'
 
 @Injectable()
 export class SearchProductsService implements SearchProductsUseCase {
+  private readonly logger = new Logger(SearchProductsService.name);
+
   constructor(
     @Inject('ProductRepository')
     private readonly productRepository: ProductRepository,
@@ -25,6 +28,8 @@ export class SearchProductsService implements SearchProductsUseCase {
     private readonly offerRepository: OfferRepository,
     @Inject('RecentSearchRepository')
     private readonly recentSearchRepository: RecentSearchRepository,
+    @Inject('RequestOffersFetchUseCase')
+    private readonly requestOffersFetchUseCase: RequestOffersFetchUseCase,
   ) {}
 
   async execute(
@@ -35,14 +40,25 @@ export class SearchProductsService implements SearchProductsUseCase {
       ? await this.productRepository.findBySearchTerm(query.q)
       : await this.productRepository.findAll();
 
-    // 2. Guardar búsqueda si hay término de búsqueda y productos encontrados
+    // 2. Si no se encuentran productos y hay término de búsqueda, disparar scraper en background
+    if (products.length === 0 && query.q) {
+      this.logger.log(
+        `No products found for "${query.q}". Triggering async scraper to fetch from vendors.`,
+      );
+
+      // Fire-and-forget: Trigger scraper without waiting (NO await)
+      // The event bus will execute handlers asynchronously in background
+      // Results will be available on user's next search (can implement polling on frontend)
+      void this.requestOffersFetchUseCase.execute(query.q);
+
+      // Return empty result immediately - don't wait for scraper to finish
+      return new SearchProductsResponseDto(query.q, 0, []);
+    }
+
+    // 3. Guardar búsqueda si hay término de búsqueda y productos encontrados
     if (query.q && products.length > 0) {
       const recentSearch = new RecentSearch(query.q, query.userId);
       await this.recentSearchRepository.save(recentSearch);
-    }
-
-    if (products.length === 0) {
-      return new SearchProductsResponseDto(query.q, 0, []);
     }
 
     // 3. Agrupar productos por canonicalProductId
