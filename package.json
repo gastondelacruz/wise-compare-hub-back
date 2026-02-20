@@ -19,11 +19,7 @@
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
-    "verify": "pnpm run lint && pnpm run format:check && pnpm audit --audit-level=moderate && pnpm run build && pnpm run test",
-    "test:scrapers": "playwright test",
-    "test:scrapers:debug": "playwright test --debug",
-    "test:scrapers:ui": "playwright test --ui",
-    "test:scrapers:headed": "playwright test --headed"
+    "verify": "pnpm run lint && pnpm run format:check && pnpm audit --audit-level=moderate && pnpm run build && pnpm run test"
   },
   "dependencies": {
     "@nestjs/axios": "^4.0.1",
