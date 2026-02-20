@@ -1,7 +1,6 @@
-import { Injectable, Inject } from '@nestjs/common';
+import { Injectable, Inject, Logger } from '@nestjs/common';
 import { EventHandler } from '@contexts/offer/application/ports/output/event-handler';
 import { OffersFetchRequested } from '@contexts/offer/domain/events/offers-fetch-requested.event';
-import { MercadoLibreOfferProvider } from '../../vendors/mercado-libre/mercado-libre-offer-provider';
 import { IngestOffersUseCase } from '@contexts/offer/application/ports/input/ingest-offers-use-case';
 import { ProductRepository } from '@contexts/product/application/ports/output/product.repository';
 import { CanonicalProductId } from '@contexts/product/domain/models/canonical-product-id.vo';
@@ -10,8 +9,7 @@ import { CanonicalProductId } from '@contexts/product/domain/models/canonical-pr
  * Handler for OffersFetchRequested events from MercadoLibre vendor.
  * Responsibilities:
  * - Listen to OffersFetchRequested events
- * - Use MercadoLibreOfferProvider to fetch offers
- * - Call IngestOffersService to ingest offers
+ * - Delegate to IngestOffersUseCase which will fetch and save offers
  *
  * Constraints:
  * - Idempotent: Multiple calls with same event produce same result
@@ -20,9 +18,9 @@ import { CanonicalProductId } from '@contexts/product/domain/models/canonical-pr
 @Injectable()
 export class MercadoLibreOffersFetchHandler implements EventHandler<OffersFetchRequested> {
   private readonly MERCADOLIBRE_VENDOR_ID = 'mercadolibre';
+  private readonly logger = new Logger(MercadoLibreOffersFetchHandler.name);
 
   constructor(
-    private readonly mercadoLibreProvider: MercadoLibreOfferProvider,
     @Inject('IngestOffersUseCase')
     private readonly ingestOffersUseCase: IngestOffersUseCase,
     @Inject('ProductRepository')
@@ -36,29 +34,34 @@ export class MercadoLibreOffersFetchHandler implements EventHandler<OffersFetchR
     }
 
     try {
-      // 1. Fetch offers from MercadoLibre
-      const offers = await this.mercadoLibreProvider.fetchOffers(
-        event.canonicalProductId,
+      this.logger.log(
+        `📬 Received offers fetch request for: ${event.canonicalProductId.value}`,
       );
 
-      if (offers.length === 0) {
-        return; // No offers to ingest
-      }
-
-      // 2. Get product metadata (name, category, imageUrl)
+      // Get product metadata (name, category, imageUrl)
       // Try to get from existing product, or use defaults
       const productMetadata = await this.getProductMetadata(
         event.canonicalProductId,
       );
 
-      // 3. Ingest offers
+      // Delegate to IngestOffersUseCase which will:
+      // 1. Fetch offers from all vendors (including MercadoLibre)
+      // 2. Create/update product
+      // 3. Save offers to database
       await this.ingestOffersUseCase.execute(
         event.canonicalProductId,
         productMetadata.name,
         productMetadata.category,
         productMetadata.imageUrl,
       );
-    } catch {
+
+      this.logger.log(
+        `✅ Successfully processed offers for: ${event.canonicalProductId.value}`,
+      );
+    } catch (error) {
+      this.logger.error(
+        `❌ Failed to process offers for ${event.canonicalProductId.value}: ${error instanceof Error ? error.message : String(error)}`,
+      );
       // Fail gracefully - safe to retry
       // Errors are logged but not thrown to allow retries
     }

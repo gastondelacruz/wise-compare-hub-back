@@ -7,6 +7,7 @@ import { Price } from '@contexts/product/domain/models/price.vo';
 import { DeliveryDays } from '@contexts/product/domain/models/delivery-days.vo';
 import { Rating } from '@contexts/product/domain/models/rating.vo';
 import { Vendor } from '@contexts/vendor/domain/models/vendor.entity';
+import { randomUUID } from 'crypto';
 
 /**
  * Maps MercadoLibre items to internal Offer entities.
@@ -59,12 +60,16 @@ export class MercadoLibreOfferMapper {
     // In a real scenario, we might need to match or create products
     const productId = new ProductId(`${canonicalProductId.value}-${item.id}`);
 
+    // Generate internal UUID for offer ID (not using external vendor ID)
+    const offerId = new OfferId(randomUUID());
+
     return new Offer(
-      new OfferId(item.id),
+      offerId,
       productId,
       this.mercadoLibreVendor,
       price,
       deliveryDays,
+      item.url,
       rating,
     );
   }

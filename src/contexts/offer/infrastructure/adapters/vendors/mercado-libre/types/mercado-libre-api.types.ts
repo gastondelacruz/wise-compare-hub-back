@@ -12,6 +12,7 @@ export interface MercadoLibreItem {
   title: string;
   price: number;
   currency_id: string;
+  url: string;
   shipping?: {
     free_shipping?: boolean;
     logistic_type?: string;

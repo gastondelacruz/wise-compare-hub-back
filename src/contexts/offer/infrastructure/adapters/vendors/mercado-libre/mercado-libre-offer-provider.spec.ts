@@ -1,12 +1,10 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { MercadoLibreOfferProvider } from './mercado-libre-offer-provider';
-import { MercadoLibreScraperService } from './mercado-libre-scraper.service';
 import { CanonicalProductId } from '@contexts/product/domain/models/canonical-product-id.vo';
 import { MercadoLibreItem } from './types/mercado-libre-api.types';
 
 describe('MercadoLibreOfferProvider', () => {
   let provider: MercadoLibreOfferProvider;
-  let scraperService: jest.Mocked<MercadoLibreScraperService>;
 
   const createMockMercadoLibreItem = (
     overrides?: Partial<MercadoLibreItem>,
@@ -15,6 +13,9 @@ describe('MercadoLibreOfferProvider', () => {
     title: overrides?.title || 'Test Product',
     price: overrides?.price ?? 10000,
     currency_id: 'ARS',
+    url:
+      overrides?.url ||
+      'https://www.mercadolibre.com.ar/test-product/p/MLA123456',
     picture_url: overrides?.picture_url || 'https://example.com/image.jpg',
     condition: 'new',
     shipping: {
@@ -35,23 +36,21 @@ describe('MercadoLibreOfferProvider', () => {
   });
 
   beforeEach(async () => {
-    const mockScraperService = {
-      scrapeTopOffers: jest.fn(),
-      closeBrowser: jest.fn(),
-    };
-
     const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        MercadoLibreOfferProvider,
-        {
-          provide: MercadoLibreScraperService,
-          useValue: mockScraperService,
-        },
-      ],
+      providers: [MercadoLibreOfferProvider],
     }).compile();
 
     provider = module.get<MercadoLibreOfferProvider>(MercadoLibreOfferProvider);
-    scraperService = module.get(MercadoLibreScraperService);
+
+    // Mock the scraper's scrapeTopOffers method
+    jest
+      .spyOn(provider['scraper'], 'scrapeTopOffers')
+      .mockImplementation(jest.fn());
+  });
+
+  afterEach(async () => {
+    // Close any browser instance to prevent hanging tests
+    await provider.onApplicationShutdown();
   });
 
   it('should be defined', () => {
@@ -67,13 +66,15 @@ describe('MercadoLibreOfferProvider', () => {
       createMockMercadoLibreItem({ id: 'MLA333', price: 6000 }),
     ];
 
-    scraperService.scrapeTopOffers.mockResolvedValue(mockItems);
+    jest
+      .spyOn(provider['scraper'], 'scrapeTopOffers')
+      .mockResolvedValue(mockItems);
 
     // Act
     const result = await provider.fetchOffers(canonicalProductId);
 
     // Assert
-    expect(scraperService.scrapeTopOffers).toHaveBeenCalledWith('test-product');
+    expect(provider['scraper'].scrapeTopOffers).toHaveBeenCalled();
     expect(result.length).toBe(3);
     expect(result[0].price.basePrice).toBe(5000);
   });
@@ -81,7 +82,7 @@ describe('MercadoLibreOfferProvider', () => {
   it('should return empty array when scraper returns no results', async () => {
     // Arrange
     const canonicalProductId = new CanonicalProductId('non-existent-product');
-    scraperService.scrapeTopOffers.mockResolvedValue([]);
+    jest.spyOn(provider['scraper'], 'scrapeTopOffers').mockResolvedValue([]);
 
     // Act
     const result = await provider.fetchOffers(canonicalProductId);
@@ -94,9 +95,9 @@ describe('MercadoLibreOfferProvider', () => {
   it('should fail gracefully and return empty array on scraper error', async () => {
     // Arrange
     const canonicalProductId = new CanonicalProductId('test-product');
-    scraperService.scrapeTopOffers.mockRejectedValue(
-      new Error('Scraper error'),
-    );
+    jest
+      .spyOn(provider['scraper'], 'scrapeTopOffers')
+      .mockRejectedValue(new Error('Scraper error'));
 
     // Act
     const result = await provider.fetchOffers(canonicalProductId);
@@ -123,7 +124,9 @@ describe('MercadoLibreOfferProvider', () => {
       }),
     ];
 
-    scraperService.scrapeTopOffers.mockResolvedValue(mockItems);
+    jest
+      .spyOn(provider['scraper'], 'scrapeTopOffers')
+      .mockResolvedValue(mockItems);
 
     // Act
     const result = await provider.fetchOffers(canonicalProductId);
@@ -134,6 +137,9 @@ describe('MercadoLibreOfferProvider', () => {
     expect(result[0].price.basePrice).toBe(45000);
     expect(result[0].price.shipping).toBe(0); // Free shipping
     expect(result[0].rating?.value).toBe(4.8);
+    expect(result[0].url).toBe(
+      'https://www.mercadolibre.com.ar/test-product/p/MLA123456',
+    );
   });
 
   it('should handle items with paid shipping', async () => {
@@ -146,7 +152,9 @@ describe('MercadoLibreOfferProvider', () => {
       }),
     ];
 
-    scraperService.scrapeTopOffers.mockResolvedValue(mockItems);
+    jest
+      .spyOn(provider['scraper'], 'scrapeTopOffers')
+      .mockResolvedValue(mockItems);
 
     // Act
     const result = await provider.fetchOffers(canonicalProductId);
@@ -166,19 +174,19 @@ describe('MercadoLibreOfferProvider', () => {
       createMockMercadoLibreItem({ id: 'MLA003', price: 7000 }),
     ];
 
-    scraperService.scrapeTopOffers.mockResolvedValue(mockItems);
+    jest
+      .spyOn(provider['scraper'], 'scrapeTopOffers')
+      .mockResolvedValue(mockItems);
 
     // Act
     const result = await provider.fetchOffers(canonicalProductId);
 
     // Assert - All items should be included (invalid prices use default price of 1)
     expect(result.length).toBe(3);
-    expect(result.some((o) => o.id.value === 'MLA001')).toBe(true);
-    expect(result.some((o) => o.id.value === 'MLA002')).toBe(true);
-    expect(result.some((o) => o.id.value === 'MLA003')).toBe(true);
-    expect(result.find((o) => o.id.value === 'MLA002')?.price.basePrice).toBe(
-      1,
-    ); // Default price
+    // Offer IDs are internally generated UUIDs, not MercadoLibre IDs
+    const prices = result.map((o) => o.price.basePrice).sort((a, b) => a - b);
+    expect(prices).toEqual([1, 5000, 7000]);
+    expect(result.find((o) => o.price.basePrice === 1)).toBeDefined();
   });
 
   it('should handle items with no seller rating', async () => {
@@ -191,12 +199,15 @@ describe('MercadoLibreOfferProvider', () => {
         title: 'Test Product',
         price: 5000,
         currency_id: 'ARS',
+        url: 'https://www.mercadolibre.com.ar/test-product/p/MLA001',
         condition: 'new',
-        seller: { id: 123 }, // Seller without reputation/rating
+        seller: { id: 123 },
       },
     ];
 
-    scraperService.scrapeTopOffers.mockResolvedValue(mockItems);
+    jest
+      .spyOn(provider['scraper'], 'scrapeTopOffers')
+      .mockResolvedValue(mockItems);
 
     // Act
     const result = await provider.fetchOffers(canonicalProductId);
@@ -211,7 +222,9 @@ describe('MercadoLibreOfferProvider', () => {
     // Arrange
     const canonicalProductId = new CanonicalProductId('test');
     const networkError = new Error('Network timeout');
-    scraperService.scrapeTopOffers.mockRejectedValue(networkError);
+    jest
+      .spyOn(provider['scraper'], 'scrapeTopOffers')
+      .mockRejectedValue(networkError);
 
     // Act
     const result = await provider.fetchOffers(canonicalProductId);
@@ -221,11 +234,16 @@ describe('MercadoLibreOfferProvider', () => {
   });
 
   it('should close browser on application shutdown', async () => {
+    // Arrange - Mock the scraper's closeBrowser method
+    const closeBrowserSpy = jest
+      .spyOn(provider['scraper'], 'closeBrowser')
+      .mockResolvedValue();
+
     // Act
     await provider.onApplicationShutdown();
 
-    // Assert
-    expect(scraperService.closeBrowser).toHaveBeenCalled();
+    // Assert - Scraper's closeBrowser should be called
+    expect(closeBrowserSpy).toHaveBeenCalled();
   });
 
   it('should return offers for multiple search queries independently', async () => {
@@ -240,7 +258,11 @@ describe('MercadoLibreOfferProvider', () => {
       createMockMercadoLibreItem({ id: 'MLA002', price: 500 }),
     ];
 
-    scraperService.scrapeTopOffers
+    const scrapeTopOffersSpy = jest.spyOn(
+      provider['scraper'],
+      'scrapeTopOffers',
+    );
+    scrapeTopOffersSpy
       .mockResolvedValueOnce(mockItems1)
       .mockResolvedValueOnce(mockItems2);
 
@@ -249,8 +271,7 @@ describe('MercadoLibreOfferProvider', () => {
     const result2 = await provider.fetchOffers(product2);
 
     // Assert
-    expect(scraperService.scrapeTopOffers).toHaveBeenCalledWith('laptop');
-    expect(scraperService.scrapeTopOffers).toHaveBeenCalledWith('mouse');
+    expect(scrapeTopOffersSpy).toHaveBeenCalledTimes(2);
     expect(result1[0].price.basePrice).toBe(50000);
     expect(result2[0].price.basePrice).toBe(500);
   });

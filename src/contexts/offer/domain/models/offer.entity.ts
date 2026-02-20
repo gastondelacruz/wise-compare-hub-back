@@ -12,6 +12,7 @@ export class Offer {
     public readonly vendor: Vendor,
     public readonly price: Price,
     public readonly deliveryDays: DeliveryDays,
+    public readonly url: string,
     public readonly rating?: Rating,
   ) {}
 }

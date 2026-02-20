@@ -23,6 +23,7 @@ describe('InMemoryOfferRepository', () => {
       ),
       new Price(1000, 0),
       new DeliveryDays(2),
+      `https://www.mercadolibre.com.ar/product/${id}`,
     );
   };
 
@@ -78,6 +79,7 @@ describe('InMemoryOfferRepository', () => {
       ),
       new Price(1000, 0),
       new DeliveryDays(2),
+      'https://www.mercadolibre.com.ar/product/offer-test-delete-2',
     );
     await repository.save(offer1);
     await repository.save(offer2);

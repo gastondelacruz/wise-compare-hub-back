@@ -37,6 +37,7 @@ describe('IngestOffersService', () => {
       ),
       new Price(1000, 0),
       new DeliveryDays(5),
+      `https://www.mercadolibre.com.ar/product/${id}`,
       new Rating(4.5),
     );
   };

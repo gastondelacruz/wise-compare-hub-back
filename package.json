@@ -19,6 +19,9 @@
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
+    "test:scraper": "npx playwright test --headed",
+    "test:scraper:ui": "npx playwright test --ui",
+    "test:scraper:debug": "npx playwright test --debug",
     "verify": "pnpm run lint && pnpm run format:check && pnpm audit --audit-level=moderate && pnpm run build && pnpm run test"
   },
   "dependencies": {

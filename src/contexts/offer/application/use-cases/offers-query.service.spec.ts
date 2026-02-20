@@ -53,6 +53,7 @@ describe('OffersQueryService', () => {
       ),
       new Price(price, 0),
       new DeliveryDays(deliveryDays),
+      `https://www.mercadolibre.com.ar/product/${id}`,
     );
   };
 

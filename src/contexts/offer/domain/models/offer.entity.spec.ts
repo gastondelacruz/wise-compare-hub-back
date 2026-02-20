@@ -30,6 +30,7 @@ describe('Offer', () => {
       vendor,
       new Price(1899, 0),
       new DeliveryDays(2),
+      'https://amazon.com/product/xyz',
       new Rating(4.5),
     );
 
@@ -38,6 +39,7 @@ describe('Offer', () => {
     expect(offer.vendor.id.value).toBe('amazon');
     expect(offer.price.total).toBe(1899);
     expect(offer.deliveryDays.value).toBe(2);
+    expect(offer.url).toBe('https://amazon.com/product/xyz');
     expect(offer.rating?.value).toBe(4.5);
   });
 
@@ -49,9 +51,11 @@ describe('Offer', () => {
       vendor,
       new Price(1999, 10),
       new DeliveryDays(5),
+      'https://bestbuy.com/product/abc',
     );
 
     expect(offer.rating).toBeUndefined();
     expect(offer.price.total).toBe(2009);
+    expect(offer.url).toBe('https://bestbuy.com/product/abc');
   });
 });

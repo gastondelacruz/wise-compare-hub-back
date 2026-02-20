@@ -16,6 +16,7 @@ import { Product } from '@contexts/product/domain/models/product.entity';
 import { Offer } from '@contexts/offer/domain/models/offer.entity';
 import { RecentSearch } from '@contexts/product/domain/models/recent-search.entity';
 import { PRODUCT_RULES } from '@contexts/product/domain/constants/product-rules';
+import { OFFER_RULES } from '@contexts/offer/domain/constants/offer-rules';
 
 @Injectable()
 export class SearchProductsService implements SearchProductsUseCase {
@@ -108,13 +109,19 @@ export class SearchProductsService implements SearchProductsUseCase {
         continue; // Skip productos sin ofertas válidas
       }
 
+      // Limit to max offers per product
+      const cappedOffers = filteredOffers.slice(
+        0,
+        OFFER_RULES.MAX_OFFERS_PER_PRODUCT,
+      );
+
       // Guardar ofertas filtradas para cálculo de rating después
-      offersByCanonicalIdForResults.set(canonicalId, filteredOffers);
+      offersByCanonicalIdForResults.set(canonicalId, cappedOffers);
 
       // Calcular agregaciones
       const product = canonicalProducts[0]; // Usar el primer producto del grupo
-      const priceRange = this.calculatePriceRange(filteredOffers);
-      const offersSummary = this.calculateOffersSummary(filteredOffers);
+      const priceRange = this.calculatePriceRange(cappedOffers);
+      const offersSummary = this.calculateOffersSummary(cappedOffers);
 
       productResults.push(
         new ProductSearchResultDto(

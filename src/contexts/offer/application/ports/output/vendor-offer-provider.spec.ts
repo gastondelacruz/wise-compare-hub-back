@@ -25,6 +25,7 @@ describe('VendorOfferProvider', () => {
       vendor,
       new Price(1000, 0),
       new DeliveryDays(2),
+      'https://amazon.com/product/xyz',
       new Rating(4.5),
     );
   };

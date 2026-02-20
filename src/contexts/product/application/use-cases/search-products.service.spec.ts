@@ -64,6 +64,7 @@ describe('SearchProductsService', () => {
       createVendor(vendorId, vendorName),
       new Price(basePrice, shipping),
       new DeliveryDays(deliveryDays),
+      `https://www.mercadolibre.com.ar/product/${id}`,
       rating ? new Rating(rating) : undefined,
     );
   };

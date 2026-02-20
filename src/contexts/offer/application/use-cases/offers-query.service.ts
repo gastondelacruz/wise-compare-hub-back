@@ -16,6 +16,7 @@ import { OfferRepository } from '../ports/output/offer.repository';
 import { CanonicalProductId } from '@contexts/product/domain/models/canonical-product-id.vo';
 import { ProductNotFoundError } from '@contexts/product/domain/exceptions/product-not-found.error';
 import { Offer } from '@contexts/offer/domain/models/offer.entity';
+import { OFFER_RULES } from '@contexts/offer/domain/constants/offer-rules';
 
 /**
  * Service responsible for querying existing offers for a product.
@@ -91,8 +92,14 @@ export class OffersQueryService implements OffersQueryUseCase {
       sortedOffers = this.sortOffers(filteredOffers, sort);
     }
 
-    // 7. Convertir a DTOs
-    const offerDtos = sortedOffers.map((offer) =>
+    // 7. Limit to max offers per product
+    const cappedOffers = sortedOffers.slice(
+      0,
+      OFFER_RULES.MAX_OFFERS_PER_PRODUCT,
+    );
+
+    // 8. Convertir a DTOs
+    const offerDtos = cappedOffers.map((offer) =>
       this.mapOfferToDto(offer, bestPrice, fastestDelivery),
     );
 
@@ -227,11 +234,8 @@ export class OffersQueryService implements OffersQueryUseCase {
       offer.deliveryDays.value === fastestDelivery,
     );
 
-    // CTA simple basado en vendor
-    const ctaDto = new CtaDto(
-      `https://${offer.vendor.id.value}.com/product/${offer.id.value}`,
-      'View offer',
-    );
+    // CTA using the real vendor URL
+    const ctaDto = new CtaDto(offer.url, 'View offer');
 
     return new OfferDto(
       offer.id.value,

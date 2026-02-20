@@ -29,6 +29,7 @@ describe('MercadoLibreOfferMapper', () => {
         title: 'Test Product',
         price: 1000,
         currency_id: 'ARS',
+        url: 'https://www.mercadolibre.com.ar/test-product/p/MLA111',
         shipping: { free_shipping: true },
         seller: { id: 123456 },
         condition: 'new',
@@ -41,9 +42,15 @@ describe('MercadoLibreOfferMapper', () => {
     // Assert
     expect(offers).toHaveLength(1);
     expect(offers[0]).toBeInstanceOf(Offer);
-    expect(offers[0].id.value).toBe('MLA111');
+    // offerId is internally generated UUID
+    expect(offers[0].id.value).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/,
+    );
     expect(offers[0].price.basePrice).toBe(1000);
     expect(offers[0].vendor.id.value).toBe('mercadolibre');
+    expect(offers[0].url).toBe(
+      'https://www.mercadolibre.com.ar/test-product/p/MLA111',
+    );
   });
 
   it('should map rating when available', () => {
@@ -55,6 +62,7 @@ describe('MercadoLibreOfferMapper', () => {
         title: 'Test Product',
         price: 1000,
         currency_id: 'ARS',
+        url: 'https://www.mercadolibre.com.ar/test-product/p/MLA111',
         seller: {
           id: 123456,
           reputation: {
@@ -85,6 +93,7 @@ describe('MercadoLibreOfferMapper', () => {
         title: 'Test Product',
         price: 1000,
         currency_id: 'ARS',
+        url: 'https://www.mercadolibre.com.ar/test-product/p/MLA111',
         seller: { id: 123456 },
         condition: 'new',
       },
@@ -106,13 +115,15 @@ describe('MercadoLibreOfferMapper', () => {
         title: 'Valid Product',
         price: 1000,
         currency_id: 'ARS',
+        url: 'https://www.mercadolibre.com.ar/valid-product/p/MLA111',
         condition: 'new',
       },
       {
         id: 'MLA222',
         title: 'Product with invalid price',
-        price: -100, // Invalid price - will use default price of 1
+        price: -100,
         currency_id: 'ARS',
+        url: 'https://www.mercadolibre.com.ar/invalid-product/p/MLA222',
         condition: 'new',
       },
     ];
@@ -121,12 +132,9 @@ describe('MercadoLibreOfferMapper', () => {
     const offers = mapper.mapItemsToOffers(items, canonicalProductId);
 
     // Assert
-    // Both items should be mapped (invalid price uses default price of 1)
     expect(offers.length).toBe(2);
-    expect(offers[0].id.value).toBe('MLA111');
-    expect(offers[0].price.basePrice).toBe(1000);
-    expect(offers[1].id.value).toBe('MLA222');
-    expect(offers[1].price.basePrice).toBe(1); // Default price for invalid prices
+    const prices = offers.map((o) => o.price.basePrice).sort((a, b) => a - b);
+    expect(prices).toEqual([1, 1000]);
   });
 
   it('should set shipping cost to 0 for free shipping', () => {
@@ -138,6 +146,7 @@ describe('MercadoLibreOfferMapper', () => {
         title: 'Test Product',
         price: 1000,
         currency_id: 'ARS',
+        url: 'https://www.mercadolibre.com.ar/test-product/p/MLA111',
         shipping: { free_shipping: true },
         condition: 'new',
       },

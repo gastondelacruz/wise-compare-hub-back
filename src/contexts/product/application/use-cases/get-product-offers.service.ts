@@ -16,6 +16,7 @@ import { OfferRepository } from '@contexts/offer/application/ports/output/offer.
 import { CanonicalProductId } from '@contexts/product/domain/models/canonical-product-id.vo';
 import { ProductNotFoundError } from '@contexts/product/domain/exceptions/product-not-found.error';
 import { Offer } from '@contexts/offer/domain/models/offer.entity';
+import { OFFER_RULES } from '@contexts/offer/domain/constants/offer-rules';
 
 @Injectable()
 export class GetProductOffersService implements GetProductOffersUseCase {
@@ -87,12 +88,18 @@ export class GetProductOffersService implements GetProductOffersUseCase {
       sortedOffers = this.sortOffers(filteredOffers, sort);
     }
 
-    // 7. Convertir a DTOs
-    const offerDtos = sortedOffers.map((offer) =>
+    // 7. Limit to max offers per product
+    const cappedOffers = sortedOffers.slice(
+      0,
+      OFFER_RULES.MAX_OFFERS_PER_PRODUCT,
+    );
+
+    // 8. Convertir a DTOs
+    const offerDtos = cappedOffers.map((offer) =>
       this.mapOfferToDto(offer, bestPrice, fastestDelivery),
     );
 
-    // 8. Calcular summary
+    // 9. Calcular summary
     const summary = new SummaryDto(
       offerDtos.length,
       bestPrice,
@@ -223,11 +230,8 @@ export class GetProductOffersService implements GetProductOffersUseCase {
       offer.deliveryDays.value === fastestDelivery,
     );
 
-    // CTA simple basado en vendor
-    const ctaDto = new CtaDto(
-      `https://${offer.vendor.id.value}.com/product/${offer.id.value}`,
-      'View offer',
-    );
+    // CTA using the real vendor URL
+    const ctaDto = new CtaDto(offer.url, 'View offer');
 
     return new OfferDto(
       offer.id.value,

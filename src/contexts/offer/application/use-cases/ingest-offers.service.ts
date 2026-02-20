@@ -8,6 +8,7 @@ import { ProductId } from '@contexts/product/domain/models/product-id.vo';
 import { CanonicalProductId } from '@contexts/product/domain/models/canonical-product-id.vo';
 import { VendorId } from '@contexts/vendor/domain/models/vendor-id.vo';
 import { Offer } from '@contexts/offer/domain/models/offer.entity';
+import { OFFER_RULES } from '@contexts/offer/domain/constants/offer-rules';
 import { randomUUID } from 'crypto';
 
 /**
@@ -67,12 +68,17 @@ export class IngestOffersService implements IngestOffersUseCase {
       return; // No offers to ingest
     }
 
-    // 4. Group offers by vendor to identify which vendors to replace
+    // 4. Limit to max offers per product (sorted by price ascending)
+    const limitedOffers = allOffers
+      .sort((a, b) => a.price.total - b.price.total)
+      .slice(0, OFFER_RULES.MAX_OFFERS_PER_PRODUCT);
+
+    // 5. Group offers by vendor to identify which vendors to replace
     const vendorsToReplace = new Set(
-      allOffers.map((offer) => offer.vendor.id.value),
+      limitedOffers.map((offer) => offer.vendor.id.value),
     );
 
-    // 5. Delete previous offers for same vendors
+    // 6. Delete previous offers for same vendors
     for (const vendorIdValue of vendorsToReplace) {
       await this.offerRepository.deleteByProductIdAndVendorId(
         product.id,
@@ -80,15 +86,15 @@ export class IngestOffersService implements IngestOffersUseCase {
       );
     }
 
-    // 6. Save new offers (update productId to match the product)
-    for (const offer of allOffers) {
-      // Create new offer with correct productId
+    // 7. Save new offers (update productId to match the product)
+    for (const offer of limitedOffers) {
       const offerWithProductId = new Offer(
         offer.id,
         product.id,
         offer.vendor,
         offer.price,
         offer.deliveryDays,
+        offer.url,
         offer.rating,
       );
       await this.offerRepository.save(offerWithProductId);
