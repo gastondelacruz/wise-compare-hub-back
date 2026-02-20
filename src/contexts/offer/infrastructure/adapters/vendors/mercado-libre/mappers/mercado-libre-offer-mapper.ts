@@ -7,6 +7,7 @@ import { Price } from '@contexts/product/domain/models/price.vo';
 import { DeliveryDays } from '@contexts/product/domain/models/delivery-days.vo';
 import { Rating } from '@contexts/product/domain/models/rating.vo';
 import { Vendor } from '@contexts/vendor/domain/models/vendor.entity';
+import { VendorOfferResult } from '@contexts/offer/application/ports/output/vendor-offer-result';
 import { randomUUID } from 'crypto';
 
 /**
@@ -19,8 +20,8 @@ export class MercadoLibreOfferMapper {
   mapItemsToOffers(
     items: MercadoLibreItem[],
     canonicalProductId: CanonicalProductId,
-  ): Offer[] {
-    return items
+  ): VendorOfferResult {
+    const offers = items
       .map((item) => {
         try {
           return this.mapItemToOffer(item, canonicalProductId);
@@ -30,6 +31,10 @@ export class MercadoLibreOfferMapper {
         }
       })
       .filter((offer): offer is Offer => offer !== null);
+
+    const productImageUrl = items.find((i) => i.picture_url)?.picture_url;
+
+    return { offers, productImageUrl };
   }
 
   private mapItemToOffer(

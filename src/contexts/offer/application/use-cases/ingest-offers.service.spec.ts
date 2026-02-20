@@ -3,6 +3,7 @@ import { IngestOffersService } from './ingest-offers.service';
 import { ProductRepository } from '@contexts/product/application/ports/output/product.repository';
 import { OfferRepository } from '@contexts/offer/application/ports/output/offer.repository';
 import { VendorOfferProvider } from '@contexts/offer/application/ports/output/vendor-offer-provider';
+import { VendorOfferResult } from '@contexts/offer/application/ports/output/vendor-offer-result';
 import { CanonicalProductId } from '@contexts/product/domain/models/canonical-product-id.vo';
 import { Product } from '@contexts/product/domain/models/product.entity';
 import { ProductId } from '@contexts/product/domain/models/product-id.vo';
@@ -41,6 +42,14 @@ describe('IngestOffersService', () => {
       new Rating(4.5),
     );
   };
+
+  const makeResult = (
+    offers: Offer[],
+    productImageUrl?: string,
+  ): VendorOfferResult => ({
+    offers,
+    productImageUrl,
+  });
 
   beforeEach(async () => {
     const mockProductRepository = {
@@ -93,8 +102,8 @@ describe('IngestOffersService', () => {
     const offers = [createMockOffer('offer-1', 'prod-1', 'mercadolibre')];
 
     productRepository.findByCanonicalProductId.mockResolvedValue([]);
-    vendorProviders[0].fetchOffers.mockResolvedValue(offers);
-    vendorProviders[1].fetchOffers.mockResolvedValue([]);
+    vendorProviders[0].fetchOffers.mockResolvedValue(makeResult(offers));
+    vendorProviders[1].fetchOffers.mockResolvedValue(makeResult([]));
 
     // Act
     await service.execute(
@@ -116,6 +125,54 @@ describe('IngestOffersService', () => {
     expect(savedProduct.category).toBe('Electronics');
   });
 
+  it('should use productImageUrl from vendor result when creating a new product', async () => {
+    // Arrange
+    const canonicalProductId = new CanonicalProductId('test-product');
+    const offers = [createMockOffer('offer-1', 'prod-1', 'mercadolibre')];
+    const scraped = 'https://http2.mlstatic.com/D_NQ_NP_real.jpg';
+
+    productRepository.findByCanonicalProductId.mockResolvedValue([]);
+    vendorProviders[0].fetchOffers.mockResolvedValue(
+      makeResult(offers, scraped),
+    );
+    vendorProviders[1].fetchOffers.mockResolvedValue(makeResult([]));
+
+    // Act
+    await service.execute(
+      canonicalProductId,
+      'Test Product',
+      'Electronics',
+      'https://example.com/fallback.jpg',
+    );
+
+    // Assert
+    const savedProduct = productRepository.save.mock.calls[0][0];
+    expect(savedProduct.imageUrl).toBe(scraped);
+  });
+
+  it('should fall back to passed imageUrl when vendor provides no image', async () => {
+    // Arrange
+    const canonicalProductId = new CanonicalProductId('test-product');
+    const offers = [createMockOffer('offer-1', 'prod-1', 'mercadolibre')];
+    const fallback = 'https://example.com/fallback.jpg';
+
+    productRepository.findByCanonicalProductId.mockResolvedValue([]);
+    vendorProviders[0].fetchOffers.mockResolvedValue(makeResult(offers));
+    vendorProviders[1].fetchOffers.mockResolvedValue(makeResult([]));
+
+    // Act
+    await service.execute(
+      canonicalProductId,
+      'Test Product',
+      'Electronics',
+      fallback,
+    );
+
+    // Assert
+    const savedProduct = productRepository.save.mock.calls[0][0];
+    expect(savedProduct.imageUrl).toBe(fallback);
+  });
+
   it('should use existing product if it exists', async () => {
     // Arrange
     const canonicalProductId = new CanonicalProductId('existing-product');
@@ -127,11 +184,10 @@ describe('IngestOffersService', () => {
       'https://example.com/existing.jpg',
     );
 
-    productRepository.findByCanonicalProductId.mockResolvedValue([
-      existingProduct,
-    ]);
-    vendorProviders[0].fetchOffers.mockResolvedValue([]);
-    vendorProviders[1].fetchOffers.mockResolvedValue([]);
+    const offers = [createMockOffer('offer-1', 'prod-existing', 'mercadolibre')];
+    productRepository.findByCanonicalProductId.mockResolvedValue([existingProduct]);
+    vendorProviders[0].fetchOffers.mockResolvedValue(makeResult(offers));
+    vendorProviders[1].fetchOffers.mockResolvedValue(makeResult([]));
 
     // Act
     await service.execute(
@@ -141,7 +197,7 @@ describe('IngestOffersService', () => {
       'https://example.com/image.jpg',
     );
 
-    // Assert
+    // Assert - product already exists so productRepository.save must NOT be called
     expect(productRepository.findByCanonicalProductId).toHaveBeenCalledWith(
       canonicalProductId,
     );
@@ -164,8 +220,8 @@ describe('IngestOffersService', () => {
     productRepository.findByCanonicalProductId.mockResolvedValue([
       existingProduct,
     ]);
-    vendorProviders[0].fetchOffers.mockResolvedValue(offers1);
-    vendorProviders[1].fetchOffers.mockResolvedValue(offers2);
+    vendorProviders[0].fetchOffers.mockResolvedValue(makeResult(offers1));
+    vendorProviders[1].fetchOffers.mockResolvedValue(makeResult(offers2));
 
     // Act
     await service.execute(
@@ -203,8 +259,8 @@ describe('IngestOffersService', () => {
     productRepository.findByCanonicalProductId.mockResolvedValue([
       existingProduct,
     ]);
-    vendorProviders[0].fetchOffers.mockResolvedValue(offers1);
-    vendorProviders[1].fetchOffers.mockResolvedValue(offers2);
+    vendorProviders[0].fetchOffers.mockResolvedValue(makeResult(offers1));
+    vendorProviders[1].fetchOffers.mockResolvedValue(makeResult(offers2));
 
     // Act
     await service.execute(
@@ -236,8 +292,8 @@ describe('IngestOffersService', () => {
     productRepository.findByCanonicalProductId.mockResolvedValue([
       existingProduct,
     ]);
-    vendorProviders[0].fetchOffers.mockResolvedValue(newOffers);
-    vendorProviders[1].fetchOffers.mockResolvedValue([]);
+    vendorProviders[0].fetchOffers.mockResolvedValue(makeResult(newOffers));
+    vendorProviders[1].fetchOffers.mockResolvedValue(makeResult([]));
 
     // Act
     await service.execute(
@@ -273,8 +329,10 @@ describe('IngestOffersService', () => {
     productRepository.findByCanonicalProductId.mockResolvedValue([
       existingProduct,
     ]);
-    vendorProviders[0].fetchOffers.mockResolvedValue(mercadolibreOffers);
-    vendorProviders[1].fetchOffers.mockResolvedValue(amazonOffers);
+    vendorProviders[0].fetchOffers.mockResolvedValue(
+      makeResult(mercadolibreOffers),
+    );
+    vendorProviders[1].fetchOffers.mockResolvedValue(makeResult(amazonOffers));
 
     // Act
     await service.execute(
@@ -299,19 +357,9 @@ describe('IngestOffersService', () => {
   it('should handle empty offers from all providers', async () => {
     // Arrange
     const canonicalProductId = new CanonicalProductId('test-product');
-    const existingProduct = new Product(
-      new ProductId('prod-1'),
-      canonicalProductId,
-      'Test Product',
-      'Electronics',
-      'https://example.com/image.jpg',
-    );
 
-    productRepository.findByCanonicalProductId.mockResolvedValue([
-      existingProduct,
-    ]);
-    vendorProviders[0].fetchOffers.mockResolvedValue([]);
-    vendorProviders[1].fetchOffers.mockResolvedValue([]);
+    vendorProviders[0].fetchOffers.mockResolvedValue(makeResult([]));
+    vendorProviders[1].fetchOffers.mockResolvedValue(makeResult([]));
 
     // Act
     await service.execute(
@@ -323,6 +371,7 @@ describe('IngestOffersService', () => {
 
     // Assert
     expect(offerRepository.save).not.toHaveBeenCalled();
+    expect(productRepository.save).not.toHaveBeenCalled();
   });
 
   it('should fail gracefully if a provider throws an error', async () => {
@@ -343,7 +392,7 @@ describe('IngestOffersService', () => {
     vendorProviders[0].fetchOffers.mockRejectedValue(
       new Error('Provider error'),
     );
-    vendorProviders[1].fetchOffers.mockResolvedValue(offers);
+    vendorProviders[1].fetchOffers.mockResolvedValue(makeResult(offers));
 
     // Act
     await service.execute(

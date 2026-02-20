@@ -1,6 +1,6 @@
 import { Injectable, Logger, OnApplicationShutdown } from '@nestjs/common';
 import { VendorOfferProvider } from '@contexts/offer/application/ports/output/vendor-offer-provider';
-import { Offer } from '@contexts/offer/domain/models/offer.entity';
+import { VendorOfferResult } from '@contexts/offer/application/ports/output/vendor-offer-result';
 import { CanonicalProductId } from '@contexts/product/domain/models/canonical-product-id.vo';
 import { MercadoLibreOfferMapper } from './mappers/mercado-libre-offer-mapper';
 import { createMercadoLibreVendor } from './mercado-libre-vendor';
@@ -30,7 +30,9 @@ export class MercadoLibreOfferProvider
     this.scraper = new MercadoLibreScraper();
   }
 
-  async fetchOffers(canonicalProductId: CanonicalProductId): Promise<Offer[]> {
+  async fetchOffers(
+    canonicalProductId: CanonicalProductId,
+  ): Promise<VendorOfferResult> {
     try {
       this.logger.log(
         `🔍 Fetching offers for product: ${canonicalProductId.value}`,
@@ -47,21 +49,21 @@ export class MercadoLibreOfferProvider
         this.logger.warn(
           `⚠️ No offers found for product: ${canonicalProductId.value}`,
         );
-        return [];
+        return { offers: [], productImageUrl: undefined };
       }
 
       // Map scraped items to domain Offers
       this.logger.log(`🗺️ Mapping ${items.length} items to domain offers...`);
-      const offers = this.offerMapper.mapItemsToOffers(
+      const result = this.offerMapper.mapItemsToOffers(
         items,
         canonicalProductId,
       );
 
       this.logger.log(
-        `✅ Successfully fetched ${offers.length} offers for product: ${canonicalProductId.value}`,
+        `✅ Successfully fetched ${result.offers.length} offers for product: ${canonicalProductId.value}`,
       );
 
-      return offers;
+      return result;
     } catch (error) {
       this.logger.error(
         `❌ Failed to fetch offers for ${canonicalProductId.value}: ${error instanceof Error ? error.message : String(error)}`,
@@ -69,8 +71,8 @@ export class MercadoLibreOfferProvider
       if (error instanceof Error && error.stack) {
         this.logger.error(`Stack trace: ${error.stack}`);
       }
-      // Fail gracefully - return empty array on any error
-      return [];
+      // Fail gracefully - return empty result on any error
+      return { offers: [], productImageUrl: undefined };
     }
   }
 

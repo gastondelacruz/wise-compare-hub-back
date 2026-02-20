@@ -98,9 +98,21 @@ export class OffersQueryService implements OffersQueryUseCase {
       OFFER_RULES.MAX_OFFERS_PER_PRODUCT,
     );
 
-    // 8. Convertir a DTOs
+    // 8. Calcular score compuesto para cada oferta
+    const maxPrice = Math.max(...cappedOffers.map((o) => o.price.total));
+    const maxDelivery = Math.max(
+      ...cappedOffers.map((o) => o.deliveryDays.value),
+    );
+
+    // 9. Convertir a DTOs
     const offerDtos = cappedOffers.map((offer) =>
-      this.mapOfferToDto(offer, bestPrice, fastestDelivery),
+      this.mapOfferToDto(
+        offer,
+        bestPrice,
+        fastestDelivery,
+        maxPrice,
+        maxDelivery,
+      ),
     );
 
     // 8. Calcular summary
@@ -205,10 +217,36 @@ export class OffersQueryService implements OffersQueryUseCase {
     return sorted;
   }
 
+  private calculateCompositeScore(
+    offer: Offer,
+    minPrice: number,
+    maxPrice: number,
+    minDelivery: number,
+    maxDelivery: number,
+  ): number {
+    const priceRange = maxPrice - minPrice;
+    const priceScore =
+      priceRange === 0 ? 1 : 1 - (offer.price.total - minPrice) / priceRange;
+
+    const deliveryRange = maxDelivery - minDelivery;
+    const deliveryScore =
+      deliveryRange === 0
+        ? 1
+        : 1 - (offer.deliveryDays.value - minDelivery) / deliveryRange;
+
+    const composite =
+      priceScore * OFFER_RULES.SCORE_WEIGHT_PRICE +
+      deliveryScore * OFFER_RULES.SCORE_WEIGHT_DELIVERY;
+
+    return Math.round(composite * OFFER_RULES.SCORE_MAX * 10) / 10;
+  }
+
   private mapOfferToDto(
     offer: Offer,
     bestPrice: number,
     fastestDelivery: number,
+    maxPrice: number,
+    maxDelivery: number,
   ): OfferDto {
     const vendorDto = new VendorDto(
       offer.vendor.id.value,
@@ -225,16 +263,20 @@ export class OffersQueryService implements OffersQueryUseCase {
 
     const deliveryDto = new DeliveryDto(offer.deliveryDays.value);
 
-    const ratingDto = offer.rating
-      ? new RatingDto(offer.rating.value)
-      : undefined;
+    const score = this.calculateCompositeScore(
+      offer,
+      bestPrice,
+      maxPrice,
+      fastestDelivery,
+      maxDelivery,
+    );
+    const ratingDto = new RatingDto(score);
 
     const flagsDto = new FlagsDto(
       offer.price.total === bestPrice,
       offer.deliveryDays.value === fastestDelivery,
     );
 
-    // CTA using the real vendor URL
     const ctaDto = new CtaDto(offer.url, 'View offer');
 
     return new OfferDto(

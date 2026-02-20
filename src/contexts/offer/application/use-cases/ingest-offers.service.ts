@@ -32,32 +32,16 @@ export class IngestOffersService implements IngestOffersUseCase {
     productCategory: string,
     productImageUrl: string,
   ): Promise<void> {
-    // 1. Check if product exists
-    const existingProducts =
-      await this.productRepository.findByCanonicalProductId(canonicalProductId);
-
-    let product: Product;
-    if (existingProducts.length === 0) {
-      // 2. Create product if it doesn't exist
-      product = new Product(
-        new ProductId(randomUUID()),
-        canonicalProductId,
-        productName,
-        productCategory,
-        productImageUrl,
-      );
-      await this.productRepository.save(product);
-    } else {
-      // Use existing product (use first one if multiple exist)
-      product = existingProducts[0];
-    }
-
-    // 3. Fetch offers from all vendor providers
+    // 1. Fetch offers from all vendor providers (before product creation to get image URL)
     const allOffers: Offer[] = [];
+    let vendorImageUrl: string | undefined;
     for (const provider of this.vendorProviders) {
       try {
-        const offers = await provider.fetchOffers(canonicalProductId);
-        allOffers.push(...offers);
+        const result = await provider.fetchOffers(canonicalProductId);
+        allOffers.push(...result.offers);
+        if (!vendorImageUrl && result.productImageUrl) {
+          vendorImageUrl = result.productImageUrl;
+        }
       } catch {
         // Fail gracefully - continue with other providers if one fails
         continue;
@@ -66,6 +50,26 @@ export class IngestOffersService implements IngestOffersUseCase {
 
     if (allOffers.length === 0) {
       return; // No offers to ingest
+    }
+
+    // 2. Check if product exists
+    const existingProducts =
+      await this.productRepository.findByCanonicalProductId(canonicalProductId);
+
+    let product: Product;
+    if (existingProducts.length === 0) {
+      // 3. Create product if it doesn't exist, preferring scraped image over fallback
+      product = new Product(
+        new ProductId(randomUUID()),
+        canonicalProductId,
+        productName,
+        productCategory,
+        vendorImageUrl ?? productImageUrl,
+      );
+      await this.productRepository.save(product);
+    } else {
+      // Use existing product (use first one if multiple exist)
+      product = existingProducts[0];
     }
 
     // 4. Limit to max offers per product (sorted by price ascending)

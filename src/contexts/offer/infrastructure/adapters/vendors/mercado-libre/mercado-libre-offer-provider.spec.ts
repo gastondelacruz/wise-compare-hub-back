@@ -75,11 +75,30 @@ describe('MercadoLibreOfferProvider', () => {
 
     // Assert
     expect(provider['scraper'].scrapeTopOffers).toHaveBeenCalled();
-    expect(result.length).toBe(3);
-    expect(result[0].price.basePrice).toBe(5000);
+    expect(result.offers.length).toBe(3);
+    expect(result.offers[0].price.basePrice).toBe(5000);
   });
 
-  it('should return empty array when scraper returns no results', async () => {
+  it('should include productImageUrl from the first scraped item', async () => {
+    // Arrange
+    const canonicalProductId = new CanonicalProductId('test-product');
+    const imageUrl = 'https://http2.mlstatic.com/D_NQ_NP_real-image.jpg';
+    const mockItems = [
+      createMockMercadoLibreItem({ id: 'MLA111', picture_url: imageUrl }),
+    ];
+
+    jest
+      .spyOn(provider['scraper'], 'scrapeTopOffers')
+      .mockResolvedValue(mockItems);
+
+    // Act
+    const result = await provider.fetchOffers(canonicalProductId);
+
+    // Assert
+    expect(result.productImageUrl).toBe(imageUrl);
+  });
+
+  it('should return empty offers when scraper returns no results', async () => {
     // Arrange
     const canonicalProductId = new CanonicalProductId('non-existent-product');
     jest.spyOn(provider['scraper'], 'scrapeTopOffers').mockResolvedValue([]);
@@ -88,11 +107,12 @@ describe('MercadoLibreOfferProvider', () => {
     const result = await provider.fetchOffers(canonicalProductId);
 
     // Assert
-    expect(result).toEqual([]);
-    expect(Array.isArray(result)).toBe(true);
+    expect(result.offers).toEqual([]);
+    expect(Array.isArray(result.offers)).toBe(true);
+    expect(result.productImageUrl).toBeUndefined();
   });
 
-  it('should fail gracefully and return empty array on scraper error', async () => {
+  it('should fail gracefully and return empty result on scraper error', async () => {
     // Arrange
     const canonicalProductId = new CanonicalProductId('test-product');
     jest
@@ -103,7 +123,8 @@ describe('MercadoLibreOfferProvider', () => {
     const result = await provider.fetchOffers(canonicalProductId);
 
     // Assert
-    expect(result).toEqual([]);
+    expect(result.offers).toEqual([]);
+    expect(result.productImageUrl).toBeUndefined();
   });
 
   it('should map scraped items to offers correctly', async () => {
@@ -132,12 +153,12 @@ describe('MercadoLibreOfferProvider', () => {
     const result = await provider.fetchOffers(canonicalProductId);
 
     // Assert
-    expect(result.length).toBe(1);
-    expect(result[0].vendor.name).toBe('MercadoLibre');
-    expect(result[0].price.basePrice).toBe(45000);
-    expect(result[0].price.shipping).toBe(0); // Free shipping
-    expect(result[0].rating?.value).toBe(4.8);
-    expect(result[0].url).toBe(
+    expect(result.offers.length).toBe(1);
+    expect(result.offers[0].vendor.name).toBe('MercadoLibre');
+    expect(result.offers[0].price.basePrice).toBe(45000);
+    expect(result.offers[0].price.shipping).toBe(0); // Free shipping
+    expect(result.offers[0].rating?.value).toBe(4.8);
+    expect(result.offers[0].url).toBe(
       'https://www.mercadolibre.com.ar/test-product/p/MLA123456',
     );
   });
@@ -160,17 +181,15 @@ describe('MercadoLibreOfferProvider', () => {
     const result = await provider.fetchOffers(canonicalProductId);
 
     // Assert
-    expect(result[0].price.shipping).toBe(50); // Default shipping cost
+    expect(result.offers[0].price.shipping).toBe(50); // Default shipping cost
   });
 
   it('should handle items with zero price by using default price', async () => {
     // Arrange
     const canonicalProductId = new CanonicalProductId('product');
-    // Note: Scraper should never return items with price 0 due to its filtering logic
-    // But for robustness, mapper uses default price of 1 for invalid prices
     const mockItems = [
       createMockMercadoLibreItem({ id: 'MLA001', price: 5000 }),
-      createMockMercadoLibreItem({ id: 'MLA002', price: 0 }), // Invalid - uses default price
+      createMockMercadoLibreItem({ id: 'MLA002', price: 0 }),
       createMockMercadoLibreItem({ id: 'MLA003', price: 7000 }),
     ];
 
@@ -181,18 +200,18 @@ describe('MercadoLibreOfferProvider', () => {
     // Act
     const result = await provider.fetchOffers(canonicalProductId);
 
-    // Assert - All items should be included (invalid prices use default price of 1)
-    expect(result.length).toBe(3);
-    // Offer IDs are internally generated UUIDs, not MercadoLibre IDs
-    const prices = result.map((o) => o.price.basePrice).sort((a, b) => a - b);
+    // Assert
+    expect(result.offers.length).toBe(3);
+    const prices = result.offers
+      .map((o) => o.price.basePrice)
+      .sort((a, b) => a - b);
     expect(prices).toEqual([1, 5000, 7000]);
-    expect(result.find((o) => o.price.basePrice === 1)).toBeDefined();
+    expect(result.offers.find((o) => o.price.basePrice === 1)).toBeDefined();
   });
 
   it('should handle items with no seller rating', async () => {
     // Arrange
     const canonicalProductId = new CanonicalProductId('product');
-    // Create item without rating by using minimal seller object
     const mockItems: MercadoLibreItem[] = [
       {
         id: 'MLA001',
@@ -213,9 +232,8 @@ describe('MercadoLibreOfferProvider', () => {
     const result = await provider.fetchOffers(canonicalProductId);
 
     // Assert
-    expect(result.length).toBe(1);
-    // When seller has no reputation data, rating should be undefined
-    expect(result[0].rating).toBeUndefined();
+    expect(result.offers.length).toBe(1);
+    expect(result.offers[0].rating).toBeUndefined();
   });
 
   it('should handle network/scraping errors gracefully', async () => {
@@ -230,7 +248,7 @@ describe('MercadoLibreOfferProvider', () => {
     const result = await provider.fetchOffers(canonicalProductId);
 
     // Assert
-    expect(result).toEqual([]);
+    expect(result.offers).toEqual([]);
   });
 
   it('should close browser on application shutdown', async () => {
@@ -272,7 +290,7 @@ describe('MercadoLibreOfferProvider', () => {
 
     // Assert
     expect(scrapeTopOffersSpy).toHaveBeenCalledTimes(2);
-    expect(result1[0].price.basePrice).toBe(50000);
-    expect(result2[0].price.basePrice).toBe(500);
+    expect(result1.offers[0].price.basePrice).toBe(50000);
+    expect(result2.offers[0].price.basePrice).toBe(500);
   });
 });

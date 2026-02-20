@@ -1,4 +1,5 @@
 import { VendorOfferProvider } from './vendor-offer-provider';
+import { VendorOfferResult } from './vendor-offer-result';
 import { Offer } from '@contexts/offer/domain/models/offer.entity';
 import { CanonicalProductId } from '@contexts/product/domain/models/canonical-product-id.vo';
 import { OfferId } from '@contexts/offer/domain/models/offer-id.vo';
@@ -39,36 +40,43 @@ describe('VendorOfferProvider', () => {
       createMockOffer('offer-1', 'prod-1'),
       createMockOffer('offer-2', 'prod-2'),
     ];
+    const expectedResult: VendorOfferResult = {
+      offers: expectedOffers,
+      productImageUrl: 'https://example.com/image.jpg',
+    };
 
     // Act & Assert - Create a mock implementation to verify the contract
     const mockProvider: VendorOfferProvider = {
-      fetchOffers: jest.fn().mockResolvedValue(expectedOffers),
+      fetchOffers: jest.fn().mockResolvedValue(expectedResult),
     };
 
     const result = await mockProvider.fetchOffers(canonicalProductId);
 
     // Verify the contract
     expect(mockProvider.fetchOffers).toHaveBeenCalledWith(canonicalProductId);
-    expect(result).toEqual(expectedOffers);
-    expect(Array.isArray(result)).toBe(true);
-    expect(result.length).toBe(2);
-    expect(result[0]).toBeInstanceOf(Offer);
+    expect(result.offers).toEqual(expectedOffers);
+    expect(Array.isArray(result.offers)).toBe(true);
+    expect(result.offers.length).toBe(2);
+    expect(result.offers[0]).toBeInstanceOf(Offer);
+    expect(result.productImageUrl).toBe('https://example.com/image.jpg');
   });
 
-  it('should return empty array when no offers are found', async () => {
+  it('should return empty offers when no offers are found', async () => {
     // Arrange
     const canonicalProductId = new CanonicalProductId('non-existent-product');
 
     // Act & Assert
     const mockProvider: VendorOfferProvider = {
-      fetchOffers: jest.fn().mockResolvedValue([]),
+      fetchOffers: jest
+        .fn()
+        .mockResolvedValue({ offers: [], productImageUrl: undefined }),
     };
 
     const result = await mockProvider.fetchOffers(canonicalProductId);
 
-    expect(result).toEqual([]);
-    expect(Array.isArray(result)).toBe(true);
-    expect(result.length).toBe(0);
+    expect(result.offers).toEqual([]);
+    expect(Array.isArray(result.offers)).toBe(true);
+    expect(result.offers.length).toBe(0);
   });
 
   it('should accept CanonicalProductId value object', async () => {
@@ -77,7 +85,9 @@ describe('VendorOfferProvider', () => {
 
     // Act & Assert - Verify the interface accepts CanonicalProductId
     const mockProvider: VendorOfferProvider = {
-      fetchOffers: jest.fn().mockResolvedValue([]),
+      fetchOffers: jest
+        .fn()
+        .mockResolvedValue({ offers: [], productImageUrl: undefined }),
     };
 
     await mockProvider.fetchOffers(canonicalProductId);
@@ -94,16 +104,36 @@ describe('VendorOfferProvider', () => {
 
     // Act & Assert
     const mockProvider: VendorOfferProvider = {
-      fetchOffers: jest.fn().mockResolvedValue([offer]),
+      fetchOffers: jest
+        .fn()
+        .mockResolvedValue({ offers: [offer], productImageUrl: undefined }),
     };
 
     const result = await mockProvider.fetchOffers(canonicalProductId);
 
-    expect(result[0]).toBeInstanceOf(Offer);
-    expect(result[0].id).toBeInstanceOf(OfferId);
-    expect(result[0].productId).toBeInstanceOf(ProductId);
-    expect(result[0].vendor).toBeInstanceOf(Vendor);
-    expect(result[0].price).toBeInstanceOf(Price);
-    expect(result[0].deliveryDays).toBeInstanceOf(DeliveryDays);
+    expect(result.offers[0]).toBeInstanceOf(Offer);
+    expect(result.offers[0].id).toBeInstanceOf(OfferId);
+    expect(result.offers[0].productId).toBeInstanceOf(ProductId);
+    expect(result.offers[0].vendor).toBeInstanceOf(Vendor);
+    expect(result.offers[0].price).toBeInstanceOf(Price);
+    expect(result.offers[0].deliveryDays).toBeInstanceOf(DeliveryDays);
+  });
+
+  it('should include productImageUrl from vendor when available', async () => {
+    // Arrange
+    const canonicalProductId = new CanonicalProductId('test-product');
+    const imageUrl = 'https://http2.mlstatic.com/D_NQ_NP_product.jpg';
+
+    const mockProvider: VendorOfferProvider = {
+      fetchOffers: jest
+        .fn()
+        .mockResolvedValue({ offers: [], productImageUrl: imageUrl }),
+    };
+
+    // Act
+    const result = await mockProvider.fetchOffers(canonicalProductId);
+
+    // Assert
+    expect(result.productImageUrl).toBe(imageUrl);
   });
 });

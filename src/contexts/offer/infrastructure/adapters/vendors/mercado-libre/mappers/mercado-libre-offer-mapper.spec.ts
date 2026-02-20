@@ -37,20 +37,63 @@ describe('MercadoLibreOfferMapper', () => {
     ];
 
     // Act
-    const offers = mapper.mapItemsToOffers(items, canonicalProductId);
+    const result = mapper.mapItemsToOffers(items, canonicalProductId);
 
     // Assert
-    expect(offers).toHaveLength(1);
-    expect(offers[0]).toBeInstanceOf(Offer);
-    // offerId is internally generated UUID
-    expect(offers[0].id.value).toMatch(
+    expect(result.offers).toHaveLength(1);
+    expect(result.offers[0]).toBeInstanceOf(Offer);
+    expect(result.offers[0].id.value).toMatch(
       /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/,
     );
-    expect(offers[0].price.basePrice).toBe(1000);
-    expect(offers[0].vendor.id.value).toBe('mercadolibre');
-    expect(offers[0].url).toBe(
+    expect(result.offers[0].price.basePrice).toBe(1000);
+    expect(result.offers[0].vendor.id.value).toBe('mercadolibre');
+    expect(result.offers[0].url).toBe(
       'https://www.mercadolibre.com.ar/test-product/p/MLA111',
     );
+  });
+
+  it('should extract productImageUrl from the first item with a picture_url', () => {
+    // Arrange
+    const canonicalProductId = new CanonicalProductId('test-product');
+    const imageUrl = 'https://http2.mlstatic.com/D_NQ_NP_product.jpg';
+    const items: MercadoLibreItem[] = [
+      {
+        id: 'MLA111',
+        title: 'Test Product',
+        price: 1000,
+        currency_id: 'ARS',
+        url: 'https://www.mercadolibre.com.ar/test-product/p/MLA111',
+        picture_url: imageUrl,
+        condition: 'new',
+      },
+    ];
+
+    // Act
+    const result = mapper.mapItemsToOffers(items, canonicalProductId);
+
+    // Assert
+    expect(result.productImageUrl).toBe(imageUrl);
+  });
+
+  it('should return productImageUrl as undefined when no item has a picture_url', () => {
+    // Arrange
+    const canonicalProductId = new CanonicalProductId('test-product');
+    const items: MercadoLibreItem[] = [
+      {
+        id: 'MLA111',
+        title: 'Test Product',
+        price: 1000,
+        currency_id: 'ARS',
+        url: 'https://www.mercadolibre.com.ar/test-product/p/MLA111',
+        condition: 'new',
+      },
+    ];
+
+    // Act
+    const result = mapper.mapItemsToOffers(items, canonicalProductId);
+
+    // Assert
+    expect(result.productImageUrl).toBeUndefined();
   });
 
   it('should map rating when available', () => {
@@ -78,10 +121,10 @@ describe('MercadoLibreOfferMapper', () => {
     ];
 
     // Act
-    const offers = mapper.mapItemsToOffers(items, canonicalProductId);
+    const result = mapper.mapItemsToOffers(items, canonicalProductId);
 
     // Assert
-    expect(offers[0].rating?.value).toBe(4.5);
+    expect(result.offers[0].rating?.value).toBe(4.5);
   });
 
   it('should not include rating when not available', () => {
@@ -100,10 +143,10 @@ describe('MercadoLibreOfferMapper', () => {
     ];
 
     // Act
-    const offers = mapper.mapItemsToOffers(items, canonicalProductId);
+    const result = mapper.mapItemsToOffers(items, canonicalProductId);
 
     // Assert
-    expect(offers[0].rating).toBeUndefined();
+    expect(result.offers[0].rating).toBeUndefined();
   });
 
   it('should map items with invalid prices using default price', () => {
@@ -129,11 +172,13 @@ describe('MercadoLibreOfferMapper', () => {
     ];
 
     // Act
-    const offers = mapper.mapItemsToOffers(items, canonicalProductId);
+    const result = mapper.mapItemsToOffers(items, canonicalProductId);
 
     // Assert
-    expect(offers.length).toBe(2);
-    const prices = offers.map((o) => o.price.basePrice).sort((a, b) => a - b);
+    expect(result.offers.length).toBe(2);
+    const prices = result.offers
+      .map((o) => o.price.basePrice)
+      .sort((a, b) => a - b);
     expect(prices).toEqual([1, 1000]);
   });
 
@@ -153,9 +198,9 @@ describe('MercadoLibreOfferMapper', () => {
     ];
 
     // Act
-    const offers = mapper.mapItemsToOffers(items, canonicalProductId);
+    const result = mapper.mapItemsToOffers(items, canonicalProductId);
 
     // Assert
-    expect(offers[0].price.shipping).toBe(0);
+    expect(result.offers[0].price.shipping).toBe(0);
   });
 });

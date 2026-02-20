@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { OffersQueryService } from './offers-query.service';
-import { ProductRepository } from '../ports/output/product.repository';
+import { ProductRepository } from '@contexts/product/application/ports/output/product.repository';
 import { OfferRepository } from '../ports/output/offer.repository';
 import { Product } from '@contexts/product/domain/models/product.entity';
 import { ProductId } from '@contexts/product/domain/models/product-id.vo';
@@ -192,5 +192,97 @@ describe('OffersQueryService', () => {
 
     expect(result.offers[0].delivery.days).toBe(3);
     expect(result.offers[1].delivery.days).toBe(5);
+  });
+
+  describe('composite score', () => {
+    it('should include a score for every offer', async () => {
+      const product = createProduct(
+        'prod-1',
+        'canonical-1',
+        'Test Product',
+        'Electronics',
+        'https://example.com/image.jpg',
+      );
+      const offer1 = createOffer('offer-1', product.id, 'amazon', 1000, 3);
+      const offer2 = createOffer('offer-2', product.id, 'bestbuy', 2000, 5);
+
+      productRepository.findByCanonicalProductId.mockResolvedValue([product]);
+      offerRepository.findByProductIds.mockResolvedValue([offer1, offer2]);
+
+      const result = await service.execute('canonical-1');
+
+      expect(result.offers[0].rating).toBeDefined();
+      expect(result.offers[0].rating?.score).toBeGreaterThanOrEqual(0);
+      expect(result.offers[0].rating?.score).toBeLessThanOrEqual(5);
+      expect(result.offers[1].rating).toBeDefined();
+      expect(result.offers[1].rating?.score).toBeGreaterThanOrEqual(0);
+      expect(result.offers[1].rating?.score).toBeLessThanOrEqual(5);
+    });
+
+    it('should give higher score to the cheapest and fastest offer', async () => {
+      const product = createProduct(
+        'prod-1',
+        'canonical-1',
+        'Test Product',
+        'Electronics',
+        'https://example.com/image.jpg',
+      );
+      // offer1: cheapest + fastest → best score
+      const offer1 = createOffer('offer-1', product.id, 'amazon', 1000, 2);
+      // offer2: most expensive + slowest → worst score
+      const offer2 = createOffer('offer-2', product.id, 'bestbuy', 2000, 8);
+
+      productRepository.findByCanonicalProductId.mockResolvedValue([product]);
+      offerRepository.findByProductIds.mockResolvedValue([offer1, offer2]);
+
+      const result = await service.execute('canonical-1');
+
+      const offer1Result = result.offers.find((o) => o.offerId === 'offer-1');
+      const offer2Result = result.offers.find((o) => o.offerId === 'offer-2');
+
+      expect(offer1Result?.rating?.score).toBeGreaterThan(
+        offer2Result?.rating?.score ?? 5,
+      );
+    });
+
+    it('should give score 5 to the single best-on-all-dimensions offer', async () => {
+      const product = createProduct(
+        'prod-1',
+        'canonical-1',
+        'Test Product',
+        'Electronics',
+        'https://example.com/image.jpg',
+      );
+      const offer1 = createOffer('offer-1', product.id, 'amazon', 1000, 2);
+      const offer2 = createOffer('offer-2', product.id, 'bestbuy', 2000, 8);
+
+      productRepository.findByCanonicalProductId.mockResolvedValue([product]);
+      offerRepository.findByProductIds.mockResolvedValue([offer1, offer2]);
+
+      const result = await service.execute('canonical-1');
+
+      const best = result.offers.find((o) => o.offerId === 'offer-1');
+      expect(best?.rating?.score).toBe(5);
+    });
+
+    it('should give score 5 to all offers when they have the same price and delivery', async () => {
+      const product = createProduct(
+        'prod-1',
+        'canonical-1',
+        'Test Product',
+        'Electronics',
+        'https://example.com/image.jpg',
+      );
+      const offer1 = createOffer('offer-1', product.id, 'amazon', 1000, 3);
+      const offer2 = createOffer('offer-2', product.id, 'bestbuy', 1000, 3);
+
+      productRepository.findByCanonicalProductId.mockResolvedValue([product]);
+      offerRepository.findByProductIds.mockResolvedValue([offer1, offer2]);
+
+      const result = await service.execute('canonical-1');
+
+      expect(result.offers[0].rating?.score).toBe(5);
+      expect(result.offers[1].rating?.score).toBe(5);
+    });
   });
 });

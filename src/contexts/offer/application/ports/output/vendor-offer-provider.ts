@@ -1,5 +1,5 @@
-import { Offer } from '@contexts/offer/domain/models/offer.entity';
 import { CanonicalProductId } from '@contexts/product/domain/models/canonical-product-id.vo';
+import { VendorOfferResult } from './vendor-offer-result';
 
 /**
  * Vendor-agnostic provider for fetching offers.
@@ -18,7 +18,9 @@ export interface VendorOfferProvider {
    * Fetches all offers for a given canonical product ID.
    *
    * @param canonicalProductId - The canonical product identifier
-   * @returns Promise resolving to an array of offers already mapped to the internal Offer model
+   * @returns Promise resolving to offers and an optional product image URL from the vendor
    */
-  fetchOffers(canonicalProductId: CanonicalProductId): Promise<Offer[]>;
+  fetchOffers(
+    canonicalProductId: CanonicalProductId,
+  ): Promise<VendorOfferResult>;
 }

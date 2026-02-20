@@ -25,7 +25,9 @@ async function bootstrap(): Promise<void> {
 
   // CORS
   app.enableCors({
-    origin: process.env.ALLOWED_ORIGINS?.split(',') || '*',
+    origin: process.env.ALLOWED_ORIGINS?.split(',') ?? [
+      'http://localhost:8080',
+    ],
     credentials: true,
   });
 

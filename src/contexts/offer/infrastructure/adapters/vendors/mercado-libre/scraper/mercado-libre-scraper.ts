@@ -255,15 +255,17 @@ export class MercadoLibreScraper {
         pictureUrl = 'https://via.placeholder.com/150';
       }
 
-      // Extract seller rating (optional - usually not shown in listing)
+      // Extract product rating from Polycard rating element
       let rating: number | undefined = undefined;
       try {
-        const ratingElement = element.locator('[class*="rating"]').first();
+        const ratingElement = element
+          .locator('span.poly-reviews__rating')
+          .first();
         const ratingText = await ratingElement.textContent({ timeout: 500 });
         if (ratingText) {
-          const ratingMatch = ratingText.match(/(\d+\.?\d*)/);
+          const ratingMatch = ratingText.match(/(\d+[.,]?\d*)/);
           if (ratingMatch) {
-            rating = parseFloat(ratingMatch[1]);
+            rating = parseFloat(ratingMatch[1].replace(',', '.'));
           }
         }
       } catch {
