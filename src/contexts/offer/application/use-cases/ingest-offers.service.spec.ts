@@ -184,8 +184,12 @@ describe('IngestOffersService', () => {
       'https://example.com/existing.jpg',
     );
 
-    const offers = [createMockOffer('offer-1', 'prod-existing', 'mercadolibre')];
-    productRepository.findByCanonicalProductId.mockResolvedValue([existingProduct]);
+    const offers = [
+      createMockOffer('offer-1', 'prod-existing', 'mercadolibre'),
+    ];
+    productRepository.findByCanonicalProductId.mockResolvedValue([
+      existingProduct,
+    ]);
     vendorProviders[0].fetchOffers.mockResolvedValue(makeResult(offers));
     vendorProviders[1].fetchOffers.mockResolvedValue(makeResult([]));
 
