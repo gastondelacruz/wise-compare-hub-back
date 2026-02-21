@@ -73,9 +73,12 @@ describe('GetProductOffersService', () => {
       findById: jest.fn(),
       findByCanonicalProductId: jest.fn(),
       findBySearchTerm: jest.fn(),
+      save: jest.fn(),
     };
     mockOfferRepository = {
       findByProductIds: jest.fn(),
+      save: jest.fn(),
+      deleteByProductIdAndVendorId: jest.fn(),
     };
     service = new GetProductOffersService(
       mockProductRepository,
